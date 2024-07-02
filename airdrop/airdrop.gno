@@ -150,7 +150,7 @@ func (a *Airdrop) Claim(claim Claim, proof [][]byte) (bool, error) {
 }
 
 // verifyProof checks if the merkle proof is valid
-func (a *Airdrop) verifyProof(claim Claim, proff [][]byte) (bool, error) {
+func (a *Airdrop) verifyProof(claim Claim, proof [][]byte) (bool, error) {
 	proof, err := a.merkleTree.Proof(claim)
 	if err != nil {
 		return false, err
