@@ -25,7 +25,7 @@ var (
 type Claim struct {
 	ID      uint64
 	Claimee string
-	Amount  *i256.Int // ? u256
+	Amount  *u256.Uint // ? u256
 }
 
 func (c Claim) Bytes() []byte {
