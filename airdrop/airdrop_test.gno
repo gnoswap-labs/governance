@@ -195,3 +195,93 @@ func TestClaim(t *testing.T) {
 		t.Error("Expected claim to fail (insufficient balance)")
 	}
 }
+
+func TestClaim64(t *testing.T) {
+    // Create a new mock GRC20 token
+    mockToken := NewMockGRC20("Test Token", "TST", 18)
+
+    // Create a new Airdrop instance
+    airdrop := NewAirdrop(mockToken, Config{})
+
+    // Set up some initial balances
+    airdropAddress := std.GetOrigCaller()
+    mockToken.balances[airdropAddress] = 1000000 // Initial balance of airdrop contract
+
+    // Create 64 claims
+    claims := make([]Claim, 64)
+    for i := 0; i < 64; i++ {
+        claims[i] = Claim{
+            ID:      uint64(i),
+            Claimee: std.Address(ufmt.Sprintf("claimee%d", i)),
+            Amount:  uint256.NewUint(1000), // Each claim is for 1000 tokens
+        }
+    }
+
+    // Test successful batch claim
+    claimed, err := airdrop.Claim64(claims)
+    if err != nil {
+        t.Errorf("Unexpected error: %v", err)
+    }
+    if claimed != 64 {
+        t.Errorf("Expected 64 claims, got %d", claimed)
+    }
+
+    // Check balances after claims
+    airdropBalance, _ := mockToken.BalanceOf(airdropAddress)
+    if airdropBalance != 936000 { // 1000000 - (64 * 1000)
+        t.Errorf("Expected airdrop balance to be 936000, got %d", airdropBalance)
+    }
+    for i := 0; i < 64; i++ {
+        claimeeBalance, _ := mockToken.BalanceOf(std.Address(ufmt.Sprintf("claimee%d", i)))
+        if claimeeBalance != 1000 {
+            t.Errorf("Expected claimee%d balance to be 1000, got %d", i, claimeeBalance)
+        }
+    }
+
+    // Test claiming again (should claim 0)
+    claimed, err = airdrop.Claim64(claims)
+    if err != nil {
+        t.Errorf("Unexpected error: %v", err)
+    }
+    if claimed != 0 {
+        t.Errorf("Expected 0 claims, got %d", claimed)
+    }
+
+    // Test with insufficient balance
+    bigClaims := make([]Claim, 64)
+    for i := 0; i < 64; i++ {
+        bigClaims[i] = Claim{
+            ID:      uint64(i + 64), // New claim IDs
+            Claimee: std.Address(ufmt.Sprintf("claimee%d", i)),
+            Amount:  uint256.NewUint(20000), // Each claim is for 20000 tokens, which is more than the remaining balance
+        }
+    }
+    claimed, err = airdrop.Claim64(bigClaims)
+    if err != ErrInsufficientBalance {
+        t.Errorf("Expected ErrInsufficientBalance, got %v", err)
+    }
+    if claimed != 0 {
+        t.Errorf("Expected 0 claims, got %d", claimed)
+    }
+
+    // Test with invalid claim count
+    invalidClaims := make([]Claim, 65) // 65 claims, which is more than allowed
+    claimed, err = airdrop.Claim64(invalidClaims)
+    if err != ErrInvalidClaimsCount {
+        t.Errorf("Expected ErrInvalidClaimsCount, got %v", err)
+    }
+    if claimed != 0 {
+        t.Errorf("Expected 0 claims, got %d", claimed)
+    }
+
+    // Test with invalid first claim ID
+    invalidFirstClaim := make([]Claim, 64)
+    invalidFirstClaim[0] = Claim{ID: 1} // First claim ID is not a multiple of 64
+    claimed, err = airdrop.Claim64(invalidFirstClaim)
+    if err != ErrFirstClaimIsNot64 {
+        t.Errorf("Expected ErrFirstClaimIsNot64, got %v", err)
+    }
+    if claimed != 0 {
+        t.Errorf("Expected 0 claims, got %d", claimed)
+    }
+}

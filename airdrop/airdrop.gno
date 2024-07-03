@@ -11,6 +11,7 @@ import (
 var (
 	ErrInvalidClaimsCount = errors.New("INVALID_CLAIMS_COUNT")
 	ErrFirstClaimIsNot64  = errors.New("FIRST_CLAIM_MUST_BE_MULT_64")
+	ErrInsufficientBalance = errors.New("INSUFFICIENT_BALANCE")
 )
 
 // Claim represents a single airdrop claim
@@ -76,7 +77,7 @@ func (a *Airdrop) Claim(claim Claim) (bool, error) {
 		return false, err
 	}
 	if airdropBalance < claim.Amount.Uint64() {
-		return false, nil
+		return false, ErrInsufficientBalance
 	}
 
 	err = a.token.Transfer(claim.Claimee, claim.Amount.Uint64())
@@ -103,19 +104,43 @@ func (a *Airdrop) Claim64(claims []Claim) (uint8, error) {
 	word := claims[0].ID / 64
 	bitmap := a.claimedBitmap[word]
 
-	var claimedCount uint8
+	var (
+		claimedCount uint8
+		totalAmount uint64
+	)
 
+	// calculate total amount and check if any claim is already processed
 	for i, claim := range claims {
 		index := uint64(i)
 		mask := uint64(1) << index
 		alreadyClaimed := bitmap&mask != 0
 
 		if !alreadyClaimed {
-			bitmap |= mask
+			totalAmount += claim.Amount.Uint64()
+		}
+	}
+
+	// check has enough balance to transfer
+	airdropBalance, err := a.token.BalanceOf(std.GetOrigCaller())
+	if err != nil {
+		return 0, err
+	}
+	if airdropBalance < totalAmount {
+		return 0, ErrInsufficientBalance
+	}
+
+	// process claims
+	for i, claim := range claims {
+		index := uint64(i)
+		mask := uint64(1) << index
+		alreadyClaimed := bitmap&mask != 0
+
+		if !alreadyClaimed {
 			err := a.token.Transfer(claim.Claimee, claim.Amount.Uint64())
 			if err != nil {
 				return claimedCount, err
 			}
+			bitmap |= mask
 			claimedCount++
 		}
 	}
