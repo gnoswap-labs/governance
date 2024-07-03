@@ -1,190 +1,118 @@
 package airdrop
 
 import (
-	"bytes"
-	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"std"
-	"time"
 
 	"gno.land/p/demo/grc/grc20"
-	i256 "gno.land/p/demo/int256"
-	"gno.land/p/demo/merkle"
-	u256 "gno.land/p/demo/uint256"
+	"gno.land/p/demo/uint256"
 )
 
 var (
-	ErrInvalidProof              = errors.New("INVALID_PROOF")
-	ErrInvalidClaimsCount        = errors.New("INVALID_CLAIMS_COUNT")
-	ErrFirstClaimIsNot128        = errors.New("FIRST_CLAIM_MUST_BE_MULT_128")
-	ErrRefundableTimestampNotSet = errors.New("REFUNDABLE_TIMESTAMP_NOT_SET")
-	ErrTooEarlyToRefund          = errors.New("TOO_EARLY_TO_REFUND")
+	ErrInvalidClaimsCount = errors.New("INVALID_CLAIMS_COUNT")
+	ErrFirstClaimIsNot64  = errors.New("FIRST_CLAIM_MUST_BE_MULT_64")
 )
 
+// Claim represents a single airdrop claim
 type Claim struct {
 	ID      uint64
-	Claimee string
-	Amount  *u256.Uint // ? u256
+	Claimee std.Address
+	Amount  *uint256.Uint
 }
 
-func (c Claim) Bytes() []byte {
-	var buf bytes.Buffer
-	idBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(idBytes, c.ID)
-	buf.Write(idBytes)
-	buf.Write([]byte(c.Claimee))
-	amountStr := c.Amount.ToString()
-	buf.Write([]byte(amountStr))
-	return buf.Bytes()
-}
-
+// Config represents the airdrop configuration
 type Config struct {
-	Root                [32]byte
-	RefundableTimestamp uint64 // TODO: timelock
+	RefundableTimestamp uint64
 	RefundTo            std.Address
 }
 
+// Airdrop represents the airdrop contract
 type Airdrop struct {
 	token         grc20.IGRC20
 	config        Config
-	claimedBitmap map[uint64]*u256.Uint
-	merkleTree    *merkle.Tree
-}
-
-type IAirdrop interface {
-	GetToken() string
-	GetConfig() Config
-	Claim(claim Claim, proof [][]byte) bool
-	Claim128(claims []Claim, remainingProof [][]byte) uint8
-	IsClaimed(claimID uint64) bool
-	Refund()
+	claimedBitmap map[uint64]uint64
 }
 
 // NewAirdrop creates a new Airdrop instance
-func NewAirdrop(token grc20.IGRC20, config Config, claims []Claim) (*Airdrop, error) {
-	// create Merkle tree
-	//
-	// need to know the number of claims to create the hashables slice
-	hashables := make([]merkle.Hashable, len(claims))
-	for i, claim := range claims {
-		hashables[i] = claim
-	}
-	tree := merkle.NewTree(hashables)
-
-	// verify that the computed root matches the provided root
-	// if hex.EncodeToString(tree.Root()) != hex.EncodeToString(config.Root[:]) {
-	// 	return nil, errors.New("computed root does not match provided root")
-	// }
-
+func NewAirdrop(token grc20.IGRC20, config Config) *Airdrop {
 	return &Airdrop{
 		token:         token,
 		config:        config,
-		claimedBitmap: make(map[uint64]*u256.Uint),
-		merkleTree:    tree,
-	}, nil
+		claimedBitmap: make(map[uint64]uint64),
+	}
 }
 
-// GetToken returns the token address
-// func (a *Airdrop) GetToken() std.Address {
-// 	// TODO: get its address
-// 	return a.token.GetAddress()
-// }
-
-// GetConfig returns the airdrop configuration
-func (a *Airdrop) GetConfig() Config {
-	return a.config
+// claimIDToBitmapIndex converts a claim ID to bitmap index
+func (a *Airdrop) claimIDToBitmapIndex(claimID uint64) (word uint64, index uint64) {
+	word = claimID / 64
+	index = claimID % 64
+	return
 }
 
-// IsClaimed checks if a claim has been made (claimed)
+// IsClaimed checks if a claim has been made
 func (a *Airdrop) IsClaimed(claimID uint64) bool {
 	word, index := a.claimIDToBitmapIndex(claimID)
 	bitmap, exists := a.claimedBitmap[word]
 	if !exists {
 		return false
 	}
-	mask := new(u256.Uint).Lsh(u256.NewUint(1), uint(index))
-	return new(u256.Uint).And(bitmap, mask).Cmp(u256.Zero()) != 0
-}
-
-// claimIDToBitmapIndex converts a claim ID to bitmap index
-func (a *Airdrop) claimIDToBitmapIndex(claimID uint64) (word uint64, index uint8) {
-	word = claimID / 256
-	index = uint8(claimID % 256)
-	return
+	return (bitmap & (1 << index)) != 0
 }
 
 // Claim processes a single claim
-func (a *Airdrop) Claim(claim Claim, proof [][]byte) (bool, error) {
-	valid, err := a.verifyProof(claim, proof)
-	if err != nil {
-		return false, err
-	}
-	if !valid {
-		return false, ErrInvalidProof
-	}
-
+func (a *Airdrop) Claim(claim Claim) (bool, error) {
 	word, index := a.claimIDToBitmapIndex(claim.ID)
-	bitmap, exists := a.claimedBitmap[word]
-	if !exists {
-		bitmap = u256.Zero()
-	}
-	mask := new(u256.Uint).Lsh(u256.NewUint(1), uint(index))
-	alreadyClaimed := new(u256.Uint).And(bitmap, mask).Cmp(u256.Zero()) != 0
+	bitmap := a.claimedBitmap[word]
+	mask := uint64(1) << index
+	alreadyClaimed := bitmap&mask != 0
 
 	if alreadyClaimed {
-		return false, nil // XXX should we return an error?
+		return false, nil
 	}
 
-	// update the bitmap
-	newBitmap := new(u256.Uint).Or(bitmap, mask)
-	a.claimedBitmap[word] = newBitmap
-
-	// transfer tokens
-	err = a.token.Transfer(std.Address(claim.Claimee), claim.Amount.Uint64())
+	// check if the airdrop contract has enough balance to transfer
+	airdropBalance, err := a.token.BalanceOf(std.GetOrigCaller())
 	if err != nil {
 		return false, err
 	}
+	if airdropBalance < claim.Amount.Uint64() {
+		return false, nil
+	}
+
+	err = a.token.Transfer(claim.Claimee, claim.Amount.Uint64())
+	if err != nil {
+		return false, err
+	}
+
+	// Update the bitmap
+	a.claimedBitmap[word] = bitmap | mask
 
 	return true, nil
 }
 
-// verifyProof checks if the merkle proof is valid
-func (a *Airdrop) verifyProof(claim Claim, proof [][]byte) (bool, error) {
-	proof, err := a.merkleTree.Proof(claim)
-	if err != nil {
-		return false, err
-	}
-	return a.merkleTree.Verify(claim, proof), nil
-}
-
-// Claim128 processes up to 128 claims in a single batch
-func (a *Airdrop) Claim128(claims []Claim, remainingProof [][]byte) (uint8, error) {
-	if len(claims) == 0 || len(claims) > 128 {
+// Claim64 processes up to 64 claims in a single batch
+func (a *Airdrop) Claim64(claims []Claim) (uint8, error) {
+	if len(claims) == 0 || len(claims) > 64 {
 		return 0, ErrInvalidClaimsCount
 	}
 
-	// verify that the first claim ID is a multiple of 128
-	if claims[0].ID%128 != 0 {
-		return 0, ErrFirstClaimIsNot128
+	if claims[0].ID%64 != 0 {
+		return 0, ErrFirstClaimIsNot64
 	}
 
-	word := claims[0].ID / 256
-	bitmap, exists := a.claimedBitmap[word]
-	if !exists {
-		bitmap = u256.Zero()
-	}
+	word := claims[0].ID / 64
+	bitmap := a.claimedBitmap[word]
 
 	var claimedCount uint8
 
 	for i, claim := range claims {
-		index := uint8(i)
-		mask := new(u256.Uint).Lsh(u256.NewUint(1), uint(index))
-		alreadyClaimed := new(u256.Uint).And(bitmap, mask).Cmp(u256.Zero()) != 0
+		index := uint64(i)
+		mask := uint64(1) << index
+		alreadyClaimed := bitmap&mask != 0
 
 		if !alreadyClaimed {
-			bitmap = new(u256.Uint).Or(bitmap, mask)
-			err := a.token.Transfer(std.Address(claim.Claimee), claim.Amount.Uint64())
+			bitmap |= mask
+			err := a.token.Transfer(claim.Claimee, claim.Amount.Uint64())
 			if err != nil {
 				return claimedCount, err
 			}
@@ -196,20 +124,7 @@ func (a *Airdrop) Claim128(claims []Claim, remainingProof [][]byte) (uint8, erro
 	return claimedCount, nil
 }
 
-// func (a *Airdrop) Refund() error {
-// 	if a.config.RefundableTimestamp == 0 {
-// 		return ErrRefundableTimestampNotSet
-// 	}
-
-// 	currentTime := uint64(time.Now().Unix())
-// 	if currentTime < a.config.RefundableTimestamp {
-// 		return ErrTooEarlyToRefund
-// 	}
-
-// 	balance, err:= a.token.BalanceOf(a.GetToken()) // ?
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	return a.token.Transfer(a.config.RefundTo, balance)
-// }
+// GetConfig returns the airdrop configuration
+func (a *Airdrop) GetConfig() Config {
+	return a.config
+}
