@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	ErrInvalidClaimsCount = errors.New("INVALID_CLAIMS_COUNT")
-	ErrFirstClaimIsNot64  = errors.New("FIRST_CLAIM_MUST_BE_MULT_64")
+	ErrInvalidClaimsCount  = errors.New("INVALID_CLAIMS_COUNT")
+	ErrFirstClaimIsNot64   = errors.New("FIRST_CLAIM_MUST_BE_MULT_64")
 	ErrInsufficientBalance = errors.New("INSUFFICIENT_BALANCE")
 )
 
@@ -32,14 +32,16 @@ type Airdrop struct {
 	token         grc20.IGRC20
 	config        Config
 	claimedBitmap map[uint64]uint64
+	address       std.Address
 }
 
 // NewAirdrop creates a new Airdrop instance
-func NewAirdrop(token grc20.IGRC20, config Config) *Airdrop {
+func NewAirdrop(token grc20.IGRC20, config Config, addr std.Address) *Airdrop {
 	return &Airdrop{
 		token:         token,
 		config:        config,
 		claimedBitmap: make(map[uint64]uint64),
+		address:       addr,
 	}
 }
 
@@ -106,7 +108,7 @@ func (a *Airdrop) Claim64(claims []Claim) (uint8, error) {
 
 	var (
 		claimedCount uint8
-		totalAmount uint64
+		totalAmount  uint64
 	)
 
 	// calculate total amount and check if any claim is already processed
@@ -133,16 +135,19 @@ func (a *Airdrop) Claim64(claims []Claim) (uint8, error) {
 	for i, claim := range claims {
 		index := uint64(i)
 		mask := uint64(1) << index
-		alreadyClaimed := bitmap&mask != 0
 
-		if !alreadyClaimed {
-			err := a.token.Transfer(claim.Claimee, claim.Amount.Uint64())
-			if err != nil {
-				return claimedCount, err
-			}
-			bitmap |= mask
-			claimedCount++
+		alreadyClaimed := bitmap&mask != 0
+		if alreadyClaimed {
+			continue
 		}
+
+		err := a.token.Transfer(claim.Claimee, claim.Amount.Uint64())
+		if err != nil {
+			return claimedCount, err
+		}
+
+		bitmap |= mask
+		claimedCount++
 	}
 
 	a.claimedBitmap[word] = bitmap
@@ -152,4 +157,8 @@ func (a *Airdrop) Claim64(claims []Claim) (uint8, error) {
 // GetConfig returns the airdrop configuration
 func (a *Airdrop) GetConfig() Config {
 	return a.config
+}
+
+func (a *Airdrop) GetAddress() std.Address {
+	return a.address
 }
