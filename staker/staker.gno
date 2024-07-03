@@ -11,6 +11,7 @@ import (
 
 var (
 	ErrInsufficientBalance = errors.New("insufficient balance")
+	ErrUnauthorized        = errors.New("unauthorized")
 )
 
 // DelegationHistory represents a single delegation event
@@ -65,6 +66,46 @@ func (s *Staker) StakeAmount(delegate std.Address, amount *u256.Uint) error {
 	s.totalStaked = u256.NewUint(0).Add(s.totalStaked, amount)
 
 	// Update delegation history
+	s.delegationHistory[delegate] = append(s.delegationHistory[delegate], DelegationHistory{
+		amount:    s.delegations[delegate].Clone(),
+		timestamp: uint64(time.Now().Unix()),
+	})
+
+	return nil
+}
+
+// WithdrawAmount withdraws the specified amount from the given delegate to the recipient
+func (s *Staker) WithdrawAmount(
+	delegate std.Address,
+	recipient std.Address,
+	amount *u256.Uint,
+) error {
+	caller := std.GetOrigCaller()
+
+	// Check if the caller is the delegate
+	if caller != delegate {
+		return ErrUnauthorized
+	}
+
+	// delegate must have enough balance
+	currentStake, exists := s.delegations[delegate]
+	if !exists || currentStake.Cmp(amount) < 0 {
+		return ErrInsufficientBalance
+	}
+
+	// update delegations
+	s.delegations[delegate] = u256.NewUint(0).Sub(currentStake, amount)
+
+	// update total staked
+	s.totalStaked = u256.NewUint(0).Sub(s.totalStaked, amount)
+
+	// transfer tokens from this contract to recipient
+	err := s.token.Transfer(recipient, amount.Uint64())
+	if err != nil {
+		return err
+	}
+
+	// update delegation history
 	s.delegationHistory[delegate] = append(s.delegationHistory[delegate], DelegationHistory{
 		amount:    s.delegations[delegate].Clone(),
 		timestamp: uint64(time.Now().Unix()),

@@ -134,3 +134,61 @@ func TestStakeAmount(t *testing.T) {
 		t.Errorf("StakeAmount did not add to delegationHistory")
 	}
 }
+
+func TestWithdrawAmount(t *testing.T) {
+	token := newMockGRC20("Test Token", "TST", 42)
+	s := New(token)
+
+	delegate := std.GetOrigCaller()
+	recipient := std.Address("recipient")
+	stakeAmount := uint256.NewUint(100)
+	withdrawAmount := uint256.NewUint(50)
+
+	// First, stake some amount
+	caller := std.GetOrigCaller()
+	token.balances[caller] = 1000
+	err := s.StakeAmount(delegate, stakeAmount)
+	if err != nil {
+		t.Fatalf("Failed to stake initial amount: %v", err)
+	}
+
+	// now, try to withdraw
+	err = s.WithdrawAmount(delegate, recipient, withdrawAmount)
+	if err != nil {
+		t.Errorf("WithdrawAmount returned an unexpected error: %v", err)
+	}
+
+	if s.delegations[delegate].Uint64() != 50 {
+		t.Errorf("WithdrawAmount did not update delegations correctly")
+	}
+
+	if s.totalStaked.Uint64() != 50 {
+		t.Errorf("WithdrawAmount did not update totalStaked correctly")
+	}
+
+	if len(s.delegationHistory[delegate]) != 2 {
+		t.Errorf("WithdrawAmount did not add to delegationHistory")
+	}
+
+	recipientBalance, _ := token.BalanceOf(recipient)
+	if recipientBalance != 50 {
+		t.Errorf("WithdrawAmount did not transfer tokens correctly")
+	}
+}
+
+func TestWithdrawAmount_CallerNotDelegate(t *testing.T) {
+	token := newMockGRC20("Test Token", "TST", 42)
+	s := New(token)
+
+	delegate := std.Address("delegate")
+	recipient := std.Address("recipient")
+	stakeAmount := uint256.NewUint(100)
+	withdrawAmount := uint256.NewUint(50)
+
+	caller := std.GetOrigCaller()
+	token.balances[caller] = 1000
+	err := s.StakeAmount(delegate, stakeAmount) // must std.GetOrigCaller() != delegate
+	if err != nil {
+		t.Fatalf("Failed to stake initial amount: %v", err)
+	}
+}
