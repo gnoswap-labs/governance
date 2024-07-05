@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gno.land/p/demo/uint256"
+	"gno.land/p/demo/ufmt"
 )
 
 // MockStaker is a mock implementation of IStakerDispatcher for testing
@@ -140,5 +141,117 @@ func TestPropose(t *testing.T) {
 		}()
 
 		Propose(calls)
+	})
+}
+
+func TestDescribe(t *testing.T) {
+	mockStaker := &MockStaker{
+		averageDelegated: uint256.NewUint(1000),
+	}
+
+	config := Config{
+		VotingStartDelay:              100,
+		VotingPeriod:                  1000,
+		VotingWeightSmoothingDuration: 100,
+		Quorum:                        uint256.NewUint(500),
+		ProposalCreationThreshold:     uint256.NewUint(100),
+		ExecutionDelay:                100,
+		ExecutionWindow:               1000,
+	}
+
+	Init(mockStaker, config)
+
+	calls := []Call{
+		{
+			To:       std.Address("test_address"),
+			Selector: 1,
+			Calldata: []byte("test_data"),
+		},
+	}
+
+	id, _ := Propose(calls)
+
+	t.Run("Non-existent proposal", func(t *testing.T) {
+		Init(mockStaker, config)
+		nonExistentID := [32]byte{}
+		defer func() {
+			if r := recover(); r != nil {
+				var errMsg string
+				switch v := r.(type) {
+				case string:
+					errMsg = v
+				case error:
+					errMsg = v.Error()
+				default:
+					errMsg = ufmt.Sprintf("unexpected panic: %v", r)
+				}
+				expectedErrMsg := "DOES_NOT_EXIST"
+				if !bytes.Contains([]byte(errMsg), []byte(expectedErrMsg)) {
+					t.Fatalf("unexpected panic message: %v", errMsg)
+				}
+			} else {
+				t.Fatalf("should panic")
+			}
+		}()
+
+		Describe(nonExistentID, "Test description")
+	})
+
+	t.Run("Already executed proposal", func(t *testing.T) {
+		proposal := gGovernor.proposals[id]
+		proposal.ExecutionState.Executed = uint64(time.Now().Unix())
+		gGovernor.proposals[id] = proposal
+
+		defer func() {
+			if r := recover(); r != nil {
+				var errMsg string
+				switch v := r.(type) {
+				case string:
+					errMsg = v
+				case error:
+					errMsg = v.Error()
+				default:
+					errMsg = ufmt.Sprintf("unexpected panic: %v", r)
+				}
+				expectedErrMsg := "ALREADY_EXECUTED"
+				if !bytes.Contains([]byte(errMsg), []byte(expectedErrMsg)) {
+					t.Fatalf("unexpected panic message: %v", errMsg)
+				}
+			} else {
+				t.Fatalf("should panic")
+			}
+		}()
+
+		Describe(id, "Test description")
+		// expect panic message: panic: already executed
+	})
+
+	t.Run("Canceled proposal", func(t *testing.T) {
+		proposal := gGovernor.proposals[id]
+		proposal.ExecutionState.Executed = 0
+		proposal.ExecutionState.Canceled = uint64(time.Now().Unix())
+		gGovernor.proposals[id] = proposal
+
+		defer func() {
+			if r := recover(); r != nil {
+				var errMsg string
+				switch v := r.(type) {
+				case string:
+					errMsg = v
+				case error:
+					errMsg = v.Error()
+				default:
+					errMsg = ufmt.Sprintf("unexpected panic: %v", r)
+				}
+				expectedErrMsg := "PROPOSAL_CANCELED"
+				if !bytes.Contains([]byte(errMsg), []byte(expectedErrMsg)) {
+					t.Fatalf("unexpected panic message: %v", errMsg)
+				}
+			} else {
+				t.Fatalf("should panic")
+			}
+		}()
+
+		Describe(id, "Test description")
 	})
 }

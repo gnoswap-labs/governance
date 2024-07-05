@@ -137,6 +137,36 @@ func Propose(calls []Call) ([32]byte, error) {
 	return id, nil
 }
 
+func Describe(id [32]byte, description string) {
+	if gGovernor == nil {
+		panic("Governor not initialized")
+	}
+
+	proposal, exists := gGovernor.proposals[id]
+	if !exists {
+		panic("DOES_NOT_EXIST")
+	}
+
+	if proposal.ExecutionState.Executed != 0 {
+		panic("ALREADY_EXECUTED")
+	}
+
+	if proposal.ExecutionState.Canceled != 0 {
+		panic("PROPOSAL_CANCELED")
+	}
+
+	if proposal.Proposer != std.GetOrigCaller() {
+		panic("NOT_PROPOSER")
+	}
+
+	// Emit the Described event
+	std.Emit(
+		"Described",
+		"id", string(id[:]), // Convert byte array to string for event emission
+		"description", description,
+	)
+}
+
 // getProposalID generates a unique proposal ID based on the contract address and nonce
 func getProposalID(address std.Address, nonce uint64) [32]byte {
 	data := make([]byte, len("governance::governor::Governor::get_proposal_id")+len(address)+8)
