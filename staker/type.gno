@@ -2,6 +2,7 @@ package staker
 
 import (
 	"std"
+
 	u256 "gno.land/p/demo/uint256"
 )
 

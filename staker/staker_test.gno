@@ -4,10 +4,11 @@ import (
 	"errors"
 	"std"
 	"testing"
+	"time"
 
 	"gno.land/p/demo/grc/grc20"
 	"gno.land/p/demo/ufmt"
-	"gno.land/p/demo/uint256"
+	u256 "gno.land/p/demo/uint256"
 )
 
 // mockGRC20 is a mock implementation of the IGRC20 interface for testing
@@ -75,12 +76,12 @@ func (m *mockGRC20) Approve(spender std.Address, amount uint64) error {
 }
 
 func (m *mockGRC20) TransferFrom(from, to std.Address, amount uint64) error {
-    if m.balances[from] < amount {
-        return ErrInsufficientBalance
-    }
-    m.balances[from] -= amount
-    m.balances[to] += amount
-    return nil
+	if m.balances[from] < amount {
+		return ErrInsufficientBalance
+	}
+	m.balances[from] -= amount
+	m.balances[to] += amount
+	return nil
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -93,7 +94,7 @@ func TestNewStaker(t *testing.T) {
 		t.Error("token not set correctly")
 	}
 
-	if s.totalStaked.Cmp(uint256.NewUint(0)) != 0 {
+	if s.totalStaked.Cmp(u256.NewUint(0)) != 0 {
 		t.Error("totalStaked not set correctly. expected 0")
 	}
 
@@ -111,7 +112,7 @@ func TestStakeAmount(t *testing.T) {
 	s := New(token)
 
 	delegate := std.Address("delegate")
-	amount := uint256.NewUint(100)
+	amount := u256.NewUint(100)
 
 	// Set up some balance for the caller
 	caller := std.GetOrigCaller()
@@ -141,8 +142,8 @@ func TestWithdrawAmount(t *testing.T) {
 
 	delegate := std.GetOrigCaller()
 	recipient := std.Address("recipient")
-	stakeAmount := uint256.NewUint(100)
-	withdrawAmount := uint256.NewUint(50)
+	stakeAmount := u256.NewUint(100)
+	withdrawAmount := u256.NewUint(50)
 
 	// First, stake some amount
 	caller := std.GetOrigCaller()
@@ -182,8 +183,8 @@ func TestWithdrawAmount_CallerNotDelegate(t *testing.T) {
 
 	delegate := std.Address("delegate")
 	recipient := std.Address("recipient")
-	stakeAmount := uint256.NewUint(100)
-	withdrawAmount := uint256.NewUint(50)
+	stakeAmount := u256.NewUint(100)
+	withdrawAmount := u256.NewUint(50)
 
 	caller := std.GetOrigCaller()
 	token.balances[caller] = 1000
@@ -191,4 +192,221 @@ func TestWithdrawAmount_CallerNotDelegate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to stake initial amount: %v", err)
 	}
+}
+
+func TestGetAverageDelegated(t *testing.T) {
+	token := newMockGRC20("Test Token", "TST", 42)
+	s := New(token)
+
+	delegate := std.Address("delegate")
+	stakeAmount := u256.NewUint(0)
+
+	err := s.StakeAmount(delegate, stakeAmount)
+	if err != nil {
+		t.Fatalf("Failed to stake initial amount: %v", err)
+	}
+
+	// simulate time passing and additional stakes
+	currentTime := uint64(1000)
+	s.delegationHistory[delegate] = []DelegationHistory{
+		{amount: u256.NewUint(1000), timestamp: currentTime},
+		{amount: u256.NewUint(1500), timestamp: currentTime + 100},
+		{amount: u256.NewUint(2000), timestamp: currentTime + 200},
+	}
+
+	tests := []struct {
+		name           string
+		start          uint64
+		end            uint64
+		expectedResult *u256.Uint
+	}{
+		{
+			name:           "Full period average",
+			start:          currentTime,
+			end:            currentTime + 200,
+			expectedResult: u256.NewUint(1250), // (1000*100 + 1500*100 + 2000*0) / 200
+		},
+		{
+			name:           "Partial period average",
+			start:          currentTime + 50,
+			end:            currentTime + 150,
+			expectedResult: u256.NewUint(1250), // (1000*50 + 1500*50) / 100
+		},
+		{
+			name:           "Single point in time",
+			start:          currentTime + 100,
+			end:            currentTime + 100,
+			expectedResult: u256.NewUint(1500),
+		},
+		{
+			name:           "Period before any stakes",
+			start:          currentTime - 100,
+			end:            currentTime - 50,
+			expectedResult: u256.NewUint(0),
+		},
+		{
+			name:           "Period after all recorded stakes",
+			start:          currentTime + 300,
+			end:            currentTime + 400,
+			expectedResult: u256.NewUint(2000),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := s.GetAverageDelegated(delegate, tt.start, tt.end)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if result.Cmp(tt.expectedResult) != 0 {
+				t.Errorf("Expected %s, got %s", tt.expectedResult.ToString(), result.ToString())
+			}
+		})
+	}
+}
+
+func TestGetAverageDelegatedOverLast(t *testing.T) {
+	token := newMockGRC20("Test Token", "TST", 42)
+	s := New(token)
+
+	delegate := std.Address("delegate")
+	stakeAmount := u256.NewUint(0)
+
+	err := s.StakeAmount(delegate, stakeAmount)
+	if err != nil {
+		t.Fatalf("Failed to stake initial amount: %v", err)
+	}
+
+	// Set up delegation history
+	now := uint64(time.Now().Unix())
+	s.delegationHistory[delegate] = []DelegationHistory{
+		{amount: u256.NewUint(1000), timestamp: now - 100},
+		{amount: u256.NewUint(2000), timestamp: now - 50},
+		{amount: u256.NewUint(3000), timestamp: now},
+	}
+
+	avg, err := s.GetAverageDelegatedOverLast(delegate, 100)
+	if err != nil {
+		t.Fatalf("GetAverageDelegatedOverLast failed: %v", err)
+	}
+
+	expected := u256.NewUint(1500) // (1000*50 + 2000*50) / 100
+	if avg.Cmp(expected) != 0 {
+		t.Errorf("Incorrect average delegated over last. Expected %v, got %v", expected, avg)
+	}
+}
+
+func TestGetCurrentDelegated(t *testing.T) {
+	token := newMockGRC20("Test Token", "TST", 18)
+	s := New(token)
+	delegate1 := std.Address("delegate1")
+	delegate2 := std.Address("delegate2")
+
+	// Set up delegation history for delegate1
+	s.delegationHistory[delegate1] = []DelegationHistory{
+		{amount: u256.NewUint(1000), timestamp: 100},
+		{amount: u256.NewUint(1500), timestamp: 200},
+		{amount: u256.NewUint(2000), timestamp: 300},
+	}
+
+	tests := []struct {
+		name           string
+		delegate       std.Address
+		expectedResult *u256.Uint
+	}{
+		{
+			name:           "Delegate with history",
+			delegate:       delegate1,
+			expectedResult: u256.NewUint(2000),
+		},
+		{
+			name:           "Delegate without history",
+			delegate:       delegate2,
+			expectedResult: u256.NewUint(0),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := s.GetCurrentDelegated(tt.delegate)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if result.Cmp(tt.expectedResult) != 0 {
+				t.Errorf("Expected %s, got %s", tt.expectedResult.ToString(), result.ToString())
+			}
+		})
+	}
+}
+
+func TestGetDelegatedAt(t *testing.T) {
+	token := newMockGRC20("Test Token", "TST", 18)
+	s := New(token)
+	delegate := std.Address("delegate")
+
+	s.delegationHistory[delegate] = []DelegationHistory{
+		{amount: u256.NewUint(1000), timestamp: 100},
+		{amount: u256.NewUint(1500), timestamp: 200},
+		{amount: u256.NewUint(2000), timestamp: 300},
+	}
+
+	tests := []struct {
+		name           string
+		timestamp      uint64
+		expectedResult *u256.Uint
+	}{
+		{
+			name:           "Before first delegation",
+			timestamp:      50,
+			expectedResult: u256.NewUint(0),
+		},
+		{
+			name:           "At first delegation",
+			timestamp:      100,
+			expectedResult: u256.NewUint(1000),
+		},
+		{
+			name:           "Between first and second delegation",
+			timestamp:      150,
+			expectedResult: u256.NewUint(1000),
+		},
+		{
+			name:           "At second delegation",
+			timestamp:      200,
+			expectedResult: u256.NewUint(1500),
+		},
+		{
+			name:           "At last delegation",
+			timestamp:      300,
+			expectedResult: u256.NewUint(2000),
+		},
+		{
+			name:           "After last delegation",
+			timestamp:      400,
+			expectedResult: u256.NewUint(2000),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := s.GetDelegatedAt(delegate, tt.timestamp)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if result.Cmp(tt.expectedResult) != 0 {
+				t.Errorf("Expected %s, got %s", tt.expectedResult.ToString(), result.ToString())
+			}
+		})
+	}
+
+	t.Run("Non-existent delegate", func(t *testing.T) {
+		nonExistentDelegate := std.Address("non-existent")
+		result, err := s.GetDelegatedAt(nonExistentDelegate, 200)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		if !result.IsZero() {
+			t.Errorf("Expected 0, got %s", result.ToString())
+		}
+	})
 }
