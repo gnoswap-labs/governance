@@ -167,6 +167,119 @@ func Describe(id [32]byte, description string) {
 	)
 }
 
+// ProposeAndDescribe combines the functionality of Propose and Describe.
+// It creates a new proposal and immediately adds a description to it.
+func ProposeAndDescribe(calls []Call, desc string) ([32]byte, error) {
+	if gGovernor == nil {
+		panic("Governor not initialized")
+	}
+
+	// 1. propose the calls
+	id, err := Propose(calls)
+	if err != nil {
+		return [32]byte{}, err
+	}
+
+	// 2. describe the proposal
+	Describe(id, desc)
+
+	return id, nil
+}
+
+// Vote allows a user to vote on a given proposal
+func Vote(id [32]byte, yes bool) {
+	if gGovernor == nil {
+		panic("Governor not initialized")
+	}
+
+	proposal, exists := gGovernor.proposals[id]
+	if !exists {
+		panic("DOES_NOT_EXIST")
+	}
+
+	if proposal.ExecutionState.Executed != 0 {
+		panic("ALREADY_EXECUTED")
+	}
+
+	config := GetConfigVersion(proposal.ConfigVersion)
+	timestampCurrent := uint64(time.Now().Unix())
+	votingStartTime := proposal.ExecutionState.Created + config.VotingStartDelay
+	voter := std.GetOrigCaller()
+
+	if timestampCurrent < votingStartTime {
+		panic("VOTING_NOT_STARTED")
+	}
+
+	if timestampCurrent >= (votingStartTime + config.VotingPeriod) {
+		panic("VOTING_ENDED")
+	}
+
+	pastVote, voted := gGovernor.vote[id][voter]
+	if voted {
+		panic("ALREADY_VOTED")
+	}
+
+	weight, err := gGovernor.staker.GetAverageDelegated(
+		voter,
+		votingStartTime-config.VotingWeightSmoothingDuration,
+		votingStartTime,
+	)
+	if err != nil {
+		panic("FAILED_TO_GET_WEIGHT")
+	}
+
+	if yes {
+		proposal.Yea = u256.Zero().Add(proposal.Yea, weight)
+	} else {
+		proposal.Nay = u256.Zero().Add(proposal.Nay, weight)
+	}
+
+	gGovernor.proposals[id] = proposal
+	if gGovernor.vote[id] == nil {
+		gGovernor.vote[id] = make(map[std.Address]uint8)
+	}
+	gGovernor.vote[id][voter] = uint8(2 + b2i(yes))
+
+	std.Emit(
+		"Voted",
+		"id", string(id[:]),
+		"voter", voter.String(),
+		"weight", weight.ToString(),
+		"yes", b2s(yes),
+	)
+}
+
+func b2i(b bool) uint8 {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+func b2s(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
+}
+
+func GetConfigVersion(version uint64) Config {
+	if gGovernor == nil {
+		panic("Governor not initialized")
+	}
+
+	if version == 0 {
+		return gGovernor.config
+	}
+
+	config, exists := gGovernor.configVersions[version]
+	if !exists {
+		panic("DOES_NOT_EXIST")
+	}
+
+	return config
+}
+
 // getProposalID generates a unique proposal ID based on the contract address and nonce
 func getProposalID(address std.Address, nonce uint64) [32]byte {
 	data := make([]byte, len("governance::governor::Governor::get_proposal_id")+len(address)+8)
