@@ -88,6 +88,10 @@ func WithdrawAmount(delegate std.Address, recipient std.Address, amount *u256.Ui
 		panic(ErrUnauthorized)
 	}
 
+	if caller != std.PrevRealm().Addr() {
+		panic(ErrUnauthorized)
+	}
+
 	// delegate must have enough balance
 	currentStake, exists := gStaker.delegations[delegate]
 	if !exists || currentStake.Cmp(amount) < 0 {
