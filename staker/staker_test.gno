@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gno.land/p/demo/grc/grc20"
+	"gno.land/p/demo/testutils"
 	"gno.land/p/demo/ufmt"
 	u256 "gno.land/p/demo/uint256"
 )
@@ -86,30 +87,9 @@ func (m *mockGRC20) TransferFrom(from, to std.Address, amount uint64) error {
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
-func TestNewStaker(t *testing.T) {
-	token := newMockGRC20("Test Token", "TST", 42)
-	s := New(token)
-
-	if s.token != token {
-		t.Error("token not set correctly")
-	}
-
-	if s.totalStaked.Cmp(u256.NewUint(0)) != 0 {
-		t.Error("totalStaked not set correctly. expected 0")
-	}
-
-	if len(s.delegations) != 0 {
-		t.Error("delegations not set correctly. expected empty map.")
-	}
-
-	if len(s.delegationHistory) != 0 {
-		t.Error("delegationHistory not set correctly. expected empty map.")
-	}
-}
-
 func TestStakeAmount(t *testing.T) {
 	token := newMockGRC20("Test Token", "TST", 42)
-	s := New(token)
+	Init(token)
 
 	delegate := std.Address("delegate")
 	amount := u256.NewUint(100)
@@ -118,27 +98,27 @@ func TestStakeAmount(t *testing.T) {
 	caller := std.GetOrigCaller()
 	token.balances[caller] = 1000
 
-	err := s.StakeAmount(delegate, amount)
+	err := StakeAmount(delegate, amount)
 	if err != nil {
 		t.Errorf("StakeAmount returned an unexpected error: %v", err)
 	}
 
-	if amount.Uint64() != 100 {
+	if gStaker.delegations[delegate].Uint64() != 100 {
 		t.Errorf("StakeAmount did not update delegations correctly")
 	}
 
-	if s.totalStaked.Uint64() != 100 {
+	if gStaker.totalStaked.Uint64() != 100 {
 		t.Errorf("StakeAmount did not update totalStaked correctly")
 	}
 
-	if len(s.delegationHistory[delegate]) != 1 {
+	if len(gStaker.delegationHistory[delegate]) != 1 {
 		t.Errorf("StakeAmount did not add to delegationHistory")
 	}
 }
 
 func TestWithdrawAmount(t *testing.T) {
 	token := newMockGRC20("Test Token", "TST", 42)
-	s := New(token)
+	Init(token)
 
 	delegate := std.GetOrigCaller()
 	recipient := std.Address("recipient")
@@ -148,26 +128,26 @@ func TestWithdrawAmount(t *testing.T) {
 	// First, stake some amount
 	caller := std.GetOrigCaller()
 	token.balances[caller] = 1000
-	err := s.StakeAmount(delegate, stakeAmount)
+	err := StakeAmount(delegate, stakeAmount)
 	if err != nil {
 		t.Fatalf("Failed to stake initial amount: %v", err)
 	}
 
 	// now, try to withdraw
-	err = s.WithdrawAmount(delegate, recipient, withdrawAmount)
+	err = WithdrawAmount(delegate, recipient, withdrawAmount)
 	if err != nil {
 		t.Errorf("WithdrawAmount returned an unexpected error: %v", err)
 	}
 
-	if s.delegations[delegate].Uint64() != 50 {
+	if gStaker.delegations[delegate].Uint64() != 50 {
 		t.Errorf("WithdrawAmount did not update delegations correctly")
 	}
 
-	if s.totalStaked.Uint64() != 50 {
+	if gStaker.totalStaked.Uint64() != 50 {
 		t.Errorf("WithdrawAmount did not update totalStaked correctly")
 	}
 
-	if len(s.delegationHistory[delegate]) != 2 {
+	if len(gStaker.delegationHistory[delegate]) != 2 {
 		t.Errorf("WithdrawAmount did not add to delegationHistory")
 	}
 
@@ -179,7 +159,7 @@ func TestWithdrawAmount(t *testing.T) {
 
 func TestWithdrawAmount_CallerNotDelegate(t *testing.T) {
 	token := newMockGRC20("Test Token", "TST", 42)
-	s := New(token)
+	Init(token)
 
 	delegate := std.Address("delegate")
 	recipient := std.Address("recipient")
@@ -188,7 +168,7 @@ func TestWithdrawAmount_CallerNotDelegate(t *testing.T) {
 
 	caller := std.GetOrigCaller()
 	token.balances[caller] = 1000
-	err := s.StakeAmount(delegate, stakeAmount) // must std.GetOrigCaller() != delegate
+	err := StakeAmount(delegate, stakeAmount) // must std.GetOrigCaller() != delegate
 	if err != nil {
 		t.Fatalf("Failed to stake initial amount: %v", err)
 	}
@@ -196,19 +176,19 @@ func TestWithdrawAmount_CallerNotDelegate(t *testing.T) {
 
 func TestGetAverageDelegated(t *testing.T) {
 	token := newMockGRC20("Test Token", "TST", 42)
-	s := New(token)
+	Init(token)
 
 	delegate := std.Address("delegate")
 	stakeAmount := u256.NewUint(0)
 
-	err := s.StakeAmount(delegate, stakeAmount)
+	err := StakeAmount(delegate, stakeAmount)
 	if err != nil {
 		t.Fatalf("Failed to stake initial amount: %v", err)
 	}
 
 	// simulate time passing and additional stakes
 	currentTime := uint64(1000)
-	s.delegationHistory[delegate] = []DelegationHistory{
+	gStaker.delegationHistory[delegate] = []DelegationHistory{
 		{amount: u256.NewUint(1000), timestamp: currentTime},
 		{amount: u256.NewUint(1500), timestamp: currentTime + 100},
 		{amount: u256.NewUint(2000), timestamp: currentTime + 200},
@@ -254,7 +234,7 @@ func TestGetAverageDelegated(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := s.GetAverageDelegated(delegate, tt.start, tt.end)
+			result, err := GetAverageDelegated(delegate, tt.start, tt.end)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
@@ -267,25 +247,25 @@ func TestGetAverageDelegated(t *testing.T) {
 
 func TestGetAverageDelegatedOverLast(t *testing.T) {
 	token := newMockGRC20("Test Token", "TST", 42)
-	s := New(token)
+	Init(token)
 
 	delegate := std.Address("delegate")
 	stakeAmount := u256.NewUint(0)
 
-	err := s.StakeAmount(delegate, stakeAmount)
+	err := StakeAmount(delegate, stakeAmount)
 	if err != nil {
 		t.Fatalf("Failed to stake initial amount: %v", err)
 	}
 
 	// Set up delegation history
 	now := uint64(time.Now().Unix())
-	s.delegationHistory[delegate] = []DelegationHistory{
+	gStaker.delegationHistory[delegate] = []DelegationHistory{
 		{amount: u256.NewUint(1000), timestamp: now - 100},
 		{amount: u256.NewUint(2000), timestamp: now - 50},
 		{amount: u256.NewUint(3000), timestamp: now},
 	}
 
-	avg, err := s.GetAverageDelegatedOverLast(delegate, 100)
+	avg, err := GetAverageDelegatedOverLast(delegate, 100)
 	if err != nil {
 		t.Fatalf("GetAverageDelegatedOverLast failed: %v", err)
 	}
@@ -298,12 +278,12 @@ func TestGetAverageDelegatedOverLast(t *testing.T) {
 
 func TestGetCurrentDelegated(t *testing.T) {
 	token := newMockGRC20("Test Token", "TST", 18)
-	s := New(token)
+	Init(token)
 	delegate1 := std.Address("delegate1")
 	delegate2 := std.Address("delegate2")
 
 	// Set up delegation history for delegate1
-	s.delegationHistory[delegate1] = []DelegationHistory{
+	gStaker.delegationHistory[delegate1] = []DelegationHistory{
 		{amount: u256.NewUint(1000), timestamp: 100},
 		{amount: u256.NewUint(1500), timestamp: 200},
 		{amount: u256.NewUint(2000), timestamp: 300},
@@ -328,7 +308,7 @@ func TestGetCurrentDelegated(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := s.GetCurrentDelegated(tt.delegate)
+			result, err := GetCurrentDelegated(tt.delegate)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
@@ -341,10 +321,10 @@ func TestGetCurrentDelegated(t *testing.T) {
 
 func TestGetDelegatedAt(t *testing.T) {
 	token := newMockGRC20("Test Token", "TST", 18)
-	s := New(token)
+	Init(token)
 	delegate := std.Address("delegate")
 
-	s.delegationHistory[delegate] = []DelegationHistory{
+	gStaker.delegationHistory[delegate] = []DelegationHistory{
 		{amount: u256.NewUint(1000), timestamp: 100},
 		{amount: u256.NewUint(1500), timestamp: 200},
 		{amount: u256.NewUint(2000), timestamp: 300},
@@ -389,7 +369,7 @@ func TestGetDelegatedAt(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := s.GetDelegatedAt(delegate, tt.timestamp)
+			result, err := GetDelegatedAt(delegate, tt.timestamp)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
@@ -400,8 +380,8 @@ func TestGetDelegatedAt(t *testing.T) {
 	}
 
 	t.Run("Non-existent delegate", func(t *testing.T) {
-		nonExistentDelegate := std.Address("non-existent")
-		result, err := s.GetDelegatedAt(nonExistentDelegate, 200)
+		dummyAddr := testutils.TestAddress("dummy")
+		result, err := GetDelegatedAt(dummyAddr, 200)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
