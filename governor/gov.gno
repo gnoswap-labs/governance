@@ -11,6 +11,8 @@ import (
 	u256 "gno.land/p/demo/uint256"
 )
 
+var timeNow = time.Now
+
 // Governor represents the governor contract
 type Governor struct {
 	staker                   IStakerDispatcher
@@ -93,7 +95,7 @@ func Propose(calls []Call) ([32]byte, error) {
 	id := getProposalID(std.GetOrigPkgAddr(), nonce)
 
 	config := gGovernor.config
-	timestampCurrent := uint64(time.Now().Unix())
+	timestampCurrent := uint64(timeNow().Unix())
 
 	latestProposalID, exists := gGovernor.latestProposalByProposer[proposer]
 	if exists {
@@ -202,7 +204,7 @@ func Vote(id [32]byte, yes bool) {
 	}
 
 	config := GetConfigVersion(proposal.ConfigVersion)
-	timestampCurrent := uint64(time.Now().Unix())
+	timestampCurrent := uint64(timeNow().Unix())
 	votingStartTime := proposal.ExecutionState.Created + config.VotingStartDelay
 	voter := std.GetOrigCaller()
 
@@ -249,20 +251,49 @@ func Vote(id [32]byte, yes bool) {
 	)
 }
 
-func b2i(b bool) uint8 {
-	if b {
-		return 1
-	}
-	return 0
+// Cancel cancels the proposal with the given ID. 
+// Only callable by the proposer or if the proposer's stake has fallen below the threshold.
+func Cancel(id [32]byte) {
+    if gGovernor == nil {
+        panic("Governor not initialized")
+    }
+
+    proposal, exists := gGovernor.proposals[id]
+    if !exists {
+        panic("DOES_NOT_EXIST")
+    }
+
+    if proposal.ExecutionState.Canceled != 0 {
+        panic("ALREADY_CANCELED")
+    }
+
+    config := GetConfigVersion(proposal.ConfigVersion)
+    timestampCurrent := uint64(timeNow().Unix())
+    if timestampCurrent >= (proposal.ExecutionState.Created + config.VotingStartDelay) {
+        panic("VOTING_STARTED")
+    }
+
+    caller := std.GetOrigCaller()
+    if caller != proposal.Proposer {
+        // If the caller is not the proposer, check if the proposer's stake has fallen below the threshold
+        avgDelegated, err := gGovernor.staker.GetAverageDelegatedOverLast(proposal.Proposer, config.VotingWeightSmoothingDuration)
+        if err != nil {
+            panic("FAILED_TO_GET_AVERAGE_DELEGATED")
+        }
+        if avgDelegated.Cmp(config.ProposalCreationThreshold) >= 0 {
+            panic("NOT_PROPOSER")
+        }
+    }
+
+    proposal.ExecutionState.Canceled = timestampCurrent
+    gGovernor.proposals[id] = proposal
+
+    std.Emit("Canceled", 
+        "id", string(id[:]),
+    )
 }
 
-func b2s(b bool) string {
-	if b {
-		return "true"
-	}
-	return "false"
-}
-
+// GetConfigVersion returns the configuration for a specific version
 func GetConfigVersion(version uint64) Config {
 	if gGovernor == nil {
 		panic("Governor not initialized")
@@ -315,4 +346,18 @@ func hashCalls(calls []Call) [32]byte {
 		buf.Write(call.Calldata)
 	}
 	return sha256.Sum256(buf.Bytes())
+}
+
+func b2i(b bool) uint8 {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+func b2s(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
 }

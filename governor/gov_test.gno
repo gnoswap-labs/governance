@@ -331,8 +331,6 @@ func TestProposeAndDescribe(t *testing.T) {
 	})
 }
 
-var timeNow = time.Now
-
 func TestVote(t *testing.T) {
 	mockStaker := &MockStaker{
 		averageDelegated: uint256.NewUint(1000),
@@ -432,6 +430,112 @@ func TestVote(t *testing.T) {
 
 	// 	Vote(id, false)
 	// })
+}
+
+func TestCancel(t *testing.T) {
+    mockStaker := &MockStaker{
+        averageDelegated: uint256.NewUint(1000),
+    }
+
+    config := Config{
+        VotingStartDelay:              100,
+        VotingPeriod:                  1000,
+        VotingWeightSmoothingDuration: 100,
+        Quorum:                        uint256.NewUint(500),
+        ProposalCreationThreshold:     uint256.NewUint(100),
+        ExecutionDelay:                100,
+        ExecutionWindow:               1000,
+    }
+
+    Init(mockStaker, config)
+
+    calls := []Call{
+        {
+            To:       std.Address("test_address"),
+            Selector: 1,
+            Calldata: []byte("test_data"),
+        },
+    }
+
+    id, _ := Propose(calls)
+
+    t.Run("Successful cancel by proposer", func(t *testing.T) {
+        Cancel(id)
+
+        proposal := gGovernor.proposals[id]
+        if proposal.ExecutionState.Canceled == 0 {
+            t.Errorf("Proposal was not canceled")
+        }
+    })
+
+    t.Run("Cancel already canceled proposal", func(t *testing.T) {
+        defer func() {
+            if r := recover(); r == nil {
+                t.Errorf("The code did not panic")
+            } else if r != "ALREADY_CANCELED" {
+                t.Errorf("Unexpected panic: %v", r)
+            }
+        }()
+
+        Cancel(id)
+    })
+
+    t.Run("Cancel after voting started", func(t *testing.T) {
+        id, _ := Propose(calls)
+
+        // Set the current time to be after voting start
+        currentTime := gGovernor.proposals[id].ExecutionState.Created + config.VotingStartDelay + 1
+        origTimeNow := timeNow
+        timeNow = func() time.Time { return time.Unix(int64(currentTime), 0) }
+        defer func() { timeNow = origTimeNow }()
+
+        defer func() {
+            if r := recover(); r == nil {
+                t.Errorf("The code did not panic")
+            } else if r != "VOTING_STARTED" {
+                t.Errorf("Unexpected panic: %v", r)
+            }
+        }()
+
+        Cancel(id)
+    })
+
+    // t.Run("Cancel by non-proposer with sufficient stake", func(t *testing.T) {
+    //     id, _ := Propose(calls)
+
+    //     // Change the caller
+    //     origCaller := std.GetOrigCaller
+    //     std.GetOrigCaller = func() std.Address { return std.Address("non_proposer") }
+    //     defer func() { std.GetOrigCaller = origCaller }()
+
+    //     defer func() {
+    //         if r := recover(); r == nil {
+    //             t.Errorf("The code did not panic")
+    //         } else if r != "NOT_PROPOSER" {
+    //             t.Errorf("Unexpected panic: %v", r)
+    //         }
+    //     }()
+
+    //     Cancel(id)
+    // })
+
+    // t.Run("Cancel by non-proposer with insufficient stake", func(t *testing.T) {
+    //     id, _ := Propose(calls)
+
+    //     // Change the caller and lower the proposer's stake
+    //     origCaller := std.GetOrigCaller
+    //     std.GetOrigCaller = func() std.Address { return std.Address("non_proposer") }
+    //     defer func() { std.GetOrigCaller = origCaller }()
+
+    //     mockStaker.averageDelegated = uint256.NewUint(50) // Below threshold
+
+    //     Cancel(id)
+
+    //     proposal := gGovernor.proposals[id]
+    //     if proposal.ExecutionState.Canceled == 0 {
+    //         t.Errorf("Proposal was not canceled")
+    //     }
+    // })
 }
 
 func TestGetConfigVersion(t *testing.T) {
