@@ -499,9 +499,41 @@ func TestCancel(t *testing.T) {
 
         Cancel(id)
     })
+}
+
+func TestCancelByNonProposer(t *testing.T) {
+    setupGovernor := func() ([32]byte, *MockStaker) {
+        mockStaker := &MockStaker{
+            averageDelegated: uint256.NewUint(1000),
+        }
+
+        config := Config{
+            VotingStartDelay:              100,
+            VotingPeriod:                  1000,
+            VotingWeightSmoothingDuration: 100,
+            Quorum:                        uint256.NewUint(500),
+            ProposalCreationThreshold:     uint256.NewUint(100),
+            ExecutionDelay:                100,
+            ExecutionWindow:               1000,
+        }
+
+        Init(mockStaker, config)
+
+        calls := []Call{
+            {
+                To:       std.Address("test_address"),
+                Selector: 1,
+                Calldata: []byte("test_data"),
+            },
+        }
+
+        id, _ := Propose(calls)
+        return id, mockStaker
+    }
 
     // t.Run("Cancel by non-proposer with sufficient stake", func(t *testing.T) {
-    //     id, _ := Propose(calls)
+	// 	t.Skip()
+    //     id, _ := setupGovernor()
 
     //     // Change the caller
     //     origCaller := std.GetOrigCaller
@@ -520,7 +552,7 @@ func TestCancel(t *testing.T) {
     // })
 
     // t.Run("Cancel by non-proposer with insufficient stake", func(t *testing.T) {
-    //     id, _ := Propose(calls)
+    //     id, mockStaker := setupGovernor()
 
     //     // Change the caller and lower the proposer's stake
     //     origCaller := std.GetOrigCaller

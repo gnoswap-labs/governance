@@ -9,6 +9,7 @@ import (
 
 	"gno.land/p/demo/grc/grc20"
 	u256 "gno.land/p/demo/uint256"
+	"gno.land/p/demo/ufmt"
 )
 
 var timeNow = time.Now
@@ -292,6 +293,121 @@ func Cancel(id [32]byte) {
         "id", string(id[:]),
     )
 }
+
+func Execute(id [32]byte, calls []Call) [][]byte {
+	if gGovernor == nil {
+		panic("Governor not initialized")
+	}
+
+	proposal, exists := gGovernor.proposals[id]
+	if !exists {
+		panic("DOES_NOT_EXIST")
+	}
+
+	callsHash := hashCalls(calls)
+	if proposal.CallsHash != callsHash {
+		panic("CALLS_HASH_MISMATCH")
+	}
+
+	if proposal.ExecutionState.Executed != 0 {
+		panic("ALREADY_EXECUTED")
+	}
+
+	if proposal.ExecutionState.Canceled != 0 {
+		panic("PROPOSAL_CANCELED")
+	}
+
+	timestampCurrent := uint64(timeNow().Unix())
+	if timestampCurrent == 0 {
+		panic("TIMESTAMP_ZERO")
+	}
+
+	config := GetConfigVersion(proposal.ConfigVersion)
+	votingEnd := proposal.ExecutionState.Created + config.VotingStartDelay + config.VotingPeriod
+	if timestampCurrent < votingEnd {
+		panic("VOTING_NOT_ENDED")
+	}
+
+	windowStart := votingEnd + config.ExecutionDelay
+	if timestampCurrent < windowStart {
+		panic("EXECUTION_WINDOW_NOT_STARTED")
+	}
+
+	windowEnd := windowStart + config.ExecutionWindow
+	if timestampCurrent >= windowEnd {
+		panic("EXECUTION_WINDOW_OVER")
+	}
+
+	if proposal.Yea.Cmp(config.Quorum) < 0 {
+		panic("QUORUM_NOT_MET")
+	}
+
+	if proposal.Yea.Cmp(proposal.Nay) < 0 {
+		panic("NO_MAJORITY")
+	}
+
+	proposal.ExecutionState.Executed = timestampCurrent
+	gGovernor.proposals[id] = proposal
+
+	results := make([][]byte, 0, len(calls))
+	for _, call := range calls {
+		result := executeCall(call)
+		results = append(results, result)
+	}
+
+	std.Emit(
+		"Executed",
+		"id", string(id[:]),
+	)
+
+	return results
+}
+
+// executeCall executes a single call (pseudo-code)
+// func executeCall(call Call) []byte {
+// 	if !std.IsOriginCall() {
+// 		panic("execute must be called directly by an EOA (externally owned account)")
+// 	}
+
+// 	// get the current realm
+// 	currentRealm := std.CurrentRealm()
+
+// 	// prepare the arguments
+// 	args := make([]string, 0, len(call.Calldata)/32+1)
+// 	args = append(args, ufmt.Sprintf("%d", call.Selector))
+// 	for i := 0; i < len(call.Calldata); i += 32 {
+// 		end := i + 32
+// 		if end > len(call.Calldata) {
+// 			end = len(call.Calldata)
+// 		}
+// 		args = append(args, string(call.Calldata[i:end]))
+// 	}
+
+// 	// execute the call
+// 	result, err := currentRealm.Call(call.To, args...)
+// 	if err != nil {
+// 		panic(ufmt.Sprintf("call execution failed: %v", err))
+// 	}
+
+// 	// convert the result to bytes
+// 	var resultBytes []byte
+// 	switch v := result.(type) {
+// 	case []byte:
+// 		resultBytes = v
+// 	case string:
+// 		resultBytes = []byte(v)
+// 	default:
+// 		resultBytes = []byte(ufmt.Sprintf("%v", result))
+// 	}
+
+// 	std.Emit("CallExecuted",
+// 		"to", call.To.String(),
+// 		"selector", call.Selector,
+// 		"result", string(resultBytes),
+// 	)
+
+// 	return resultBytes
+// }
 
 // GetConfigVersion returns the configuration for a specific version
 func GetConfigVersion(version uint64) Config {
