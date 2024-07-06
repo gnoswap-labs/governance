@@ -76,15 +76,15 @@ func (a *Airdrop) Claim(claim Claim) (bool, error) {
 	// check if the airdrop contract has enough balance to transfer
 	airdropBalance, err := a.token.BalanceOf(std.GetOrigCaller())
 	if err != nil {
-		return false, err
+		panic(err)
 	}
 	if airdropBalance < claim.Amount.Uint64() {
-		return false, ErrInsufficientBalance
+		panic(ErrInsufficientBalance)
 	}
 
 	err = a.token.Transfer(claim.Claimee, claim.Amount.Uint64())
 	if err != nil {
-		return false, err
+		panic(err)
 	}
 
 	// Update the bitmap
@@ -96,11 +96,11 @@ func (a *Airdrop) Claim(claim Claim) (bool, error) {
 // Claim64 processes up to 64 claims in a single batch
 func (a *Airdrop) Claim64(claims []Claim) (uint8, error) {
 	if len(claims) == 0 || len(claims) > 64 {
-		return 0, ErrInvalidClaimsCount
+		panic(ErrInvalidClaimsCount)
 	}
 
 	if claims[0].ID%64 != 0 {
-		return 0, ErrFirstClaimIsNot64
+		panic(ErrFirstClaimIsNot64)
 	}
 
 	word := claims[0].ID / 64
@@ -128,7 +128,7 @@ func (a *Airdrop) Claim64(claims []Claim) (uint8, error) {
 		return 0, err
 	}
 	if airdropBalance < totalAmount {
-		return 0, ErrInsufficientBalance
+		panic(ErrInsufficientBalance)
 	}
 
 	// process claims

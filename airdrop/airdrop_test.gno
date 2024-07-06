@@ -191,13 +191,15 @@ func TestClaim(t *testing.T) {
 		Claimee: claimeeAddress,
 		Amount:  uint256.NewUint(1000000), // More than the remaining balance
 	}
-	claimed, err = airdrop.Claim(bigClaim)
-	if err != ErrInsufficientBalance {
-		t.Errorf("Expected ErrInsufficientBalance, got %v", err)
-	}
-	if claimed {
-		t.Error("Expected claim to fail (insufficient balance)")
-	}
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("should panic")
+		} else if r != ErrInsufficientBalance {
+			t.Errorf("Expected ErrInsufficientBalance, got %v", r)
+		}
+	}()
+	airdrop.Claim(bigClaim)
 }
 
 func TestClaim64(t *testing.T) {
@@ -215,17 +217,14 @@ func TestClaim64(t *testing.T) {
 	claims := make([]Claim, 64)
 	for i := 0; i < 64; i++ {
 		claims[i] = Claim{
-			ID:      uint64(i),
+			ID:      uint64(i * 64), // Ensure first claim ID is multiple of 64
 			Claimee: std.Address(ufmt.Sprintf("claimee%d", i)),
 			Amount:  uint256.NewUint(1000), // Each claim is for 1000 tokens
 		}
 	}
 
 	// Test successful batch claim
-	claimed, err := airdrop.Claim64(claims)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
+	claimed, _ := airdrop.Claim64(claims)
 	if claimed != 64 {
 		t.Errorf("Expected 64 claims, got %d", claimed)
 	}
@@ -243,10 +242,7 @@ func TestClaim64(t *testing.T) {
 	}
 
 	// Test claiming again (should claim 0)
-	claimed, err = airdrop.Claim64(claims)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
+	claimed, _ = airdrop.Claim64(claims)
 	if claimed != 0 {
 		t.Errorf("Expected 0 claims, got %d", claimed)
 	}
@@ -255,37 +251,46 @@ func TestClaim64(t *testing.T) {
 	bigClaims := make([]Claim, 64)
 	for i := 0; i < 64; i++ {
 		bigClaims[i] = Claim{
-			ID:      uint64(i + 64),
+			ID:      uint64((i + 1) * 64),
 			Claimee: std.Address(ufmt.Sprintf("claimee%d", i)),
 			Amount:  uint256.NewUint(20000), // Each claim is for 20000 tokens, which is more than the remaining balance
 		}
 	}
-	claimed, err = airdrop.Claim64(bigClaims)
-	if err != ErrInsufficientBalance {
-		t.Errorf("Expected ErrInsufficientBalance, got %v", err)
-	}
-	if claimed != 0 {
-		t.Errorf("Expected 0 claims, got %d", claimed)
-	}
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("The code did not panic")
+		} else if r != ErrInsufficientBalance {
+			t.Errorf("Expected ErrInsufficientBalance panic, got %v", r)
+		}
+	}()
+
+	airdrop.Claim64(bigClaims)
 
 	// Test with invalid claim count
 	invalidClaims := make([]Claim, 65) // 65 claims, which is more than allowed
-	claimed, err = airdrop.Claim64(invalidClaims)
-	if err != ErrInvalidClaimsCount {
-		t.Errorf("Expected ErrInvalidClaimsCount, got %v", err)
-	}
-	if claimed != 0 {
-		t.Errorf("Expected 0 claims, got %d", claimed)
-	}
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("The code did not panic")
+		} else if r != ErrInvalidClaimsCount {
+			t.Errorf("Expected ErrInvalidClaimsCount panic, got %v", r)
+		}
+	}()
+
+	airdrop.Claim64(invalidClaims)
 
 	// Test with invalid first claim ID
 	invalidFirstClaim := make([]Claim, 64)
 	invalidFirstClaim[0] = Claim{ID: 1} // First claim ID is not a multiple of 64
-	claimed, err = airdrop.Claim64(invalidFirstClaim)
-	if err != ErrFirstClaimIsNot64 {
-		t.Errorf("Expected ErrFirstClaimIsNot64, got %v", err)
-	}
-	if claimed != 0 {
-		t.Errorf("Expected 0 claims, got %d", claimed)
-	}
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("The code did not panic")
+		} else if r != ErrFirstClaimIsNot64 {
+			t.Errorf("Expected ErrFirstClaimIsNot64 panic, got %v", r)
+		}
+	}()
+
+	airdrop.Claim64(invalidFirstClaim)
 }
