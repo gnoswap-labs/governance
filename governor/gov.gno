@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"gno.land/p/demo/grc/grc20"
-	u256 "gno.land/p/demo/uint256"
 	"gno.land/p/demo/ufmt"
+	u256 "gno.land/p/demo/uint256"
 )
 
 var (
-	timeNow = time.Now
+	timeNow   = time.Now
 	gGovernor *Governor
 )
 
@@ -83,7 +83,12 @@ func Propose(calls []Call) ([32]byte, error) {
 	gGovernor.proposals[id] = proposal
 	gGovernor.latestProposalByProposer[proposer] = id
 
-	// TODO: use Emit
+	std.Emit(
+		"Proposed",
+		"id", string(id[:]),
+		"proposer", proposer.String(),
+		"calls", ufmt.Sprintf("%v", calls),
+	)
 
 	return id, nil
 }
@@ -200,116 +205,117 @@ func Vote(id [32]byte, yes bool) {
 	)
 }
 
-// Cancel cancels the proposal with the given ID. 
+// Cancel cancels the proposal with the given ID.
 // Only callable by the proposer or if the proposer's stake has fallen below the threshold.
 func Cancel(id [32]byte) {
-    if gGovernor == nil {
-        panic("Governor not initialized")
-    }
+	if gGovernor == nil {
+		panic("Governor not initialized")
+	}
 
-    proposal, exists := gGovernor.proposals[id]
-    if !exists {
-        panic("DOES_NOT_EXIST")
-    }
+	proposal, exists := gGovernor.proposals[id]
+	if !exists {
+		panic("DOES_NOT_EXIST")
+	}
 
-    if proposal.ExecutionState.Canceled != 0 {
-        panic("ALREADY_CANCELED")
-    }
+	if proposal.ExecutionState.Canceled != 0 {
+		panic("ALREADY_CANCELED")
+	}
 
-    config := GetConfigVersion(proposal.ConfigVersion)
-    timestampCurrent := uint64(timeNow().Unix())
-    if timestampCurrent >= (proposal.ExecutionState.Created + config.VotingStartDelay) {
-        panic("VOTING_STARTED")
-    }
+	config := GetConfigVersion(proposal.ConfigVersion)
+	timestampCurrent := uint64(timeNow().Unix())
+	if timestampCurrent >= (proposal.ExecutionState.Created + config.VotingStartDelay) {
+		panic("VOTING_STARTED")
+	}
 
-    caller := std.GetOrigCaller()
-    if caller != proposal.Proposer {
-        // If the caller is not the proposer, check if the proposer's stake has fallen below the threshold
-        avgDelegated, err := gGovernor.staker.GetAverageDelegatedOverLast(proposal.Proposer, config.VotingWeightSmoothingDuration)
-        if err != nil {
-            panic("FAILED_TO_GET_AVERAGE_DELEGATED")
-        }
-        if avgDelegated.Cmp(config.ProposalCreationThreshold) >= 0 {
-            panic("NOT_PROPOSER")
-        }
-    }
+	caller := std.GetOrigCaller()
+	if caller != proposal.Proposer {
+		// If the caller is not the proposer, check if the proposer's stake has fallen below the threshold
+		avgDelegated, err := gGovernor.staker.GetAverageDelegatedOverLast(proposal.Proposer, config.VotingWeightSmoothingDuration)
+		if err != nil {
+			panic("FAILED_TO_GET_AVERAGE_DELEGATED")
+		}
+		if avgDelegated.Cmp(config.ProposalCreationThreshold) >= 0 {
+			panic("NOT_PROPOSER")
+		}
+	}
 
-    proposal.ExecutionState.Canceled = timestampCurrent
-    gGovernor.proposals[id] = proposal
+	proposal.ExecutionState.Canceled = timestampCurrent
+	gGovernor.proposals[id] = proposal
 
-    std.Emit("Canceled", 
-        "id", string(id[:]),
-    )
+	std.Emit("Canceled",
+		"id", string(id[:]),
+	)
 }
 
-// func Execute(id [32]byte, calls []Call) [][]byte {
-// 	if gGovernor == nil {
-// 		panic("Governor not initialized")
-// 	}
+// Execute excutes the given proposal.
+func Execute(id [32]byte, calls []Call) [][]byte {
+	if gGovernor == nil {
+		panic("Governor not initialized")
+	}
 
-// 	proposal, exists := gGovernor.proposals[id]
-// 	if !exists {
-// 		panic("DOES_NOT_EXIST")
-// 	}
+	proposal, exists := gGovernor.proposals[id]
+	if !exists {
+		panic("DOES_NOT_EXIST")
+	}
 
-// 	callsHash := hashCalls(calls)
-// 	if proposal.CallsHash != callsHash {
-// 		panic("CALLS_HASH_MISMATCH")
-// 	}
+	callsHash := hashCalls(calls)
+	if proposal.CallsHash != callsHash {
+		panic("CALLS_HASH_MISMATCH")
+	}
 
-// 	if proposal.ExecutionState.Executed != 0 {
-// 		panic("ALREADY_EXECUTED")
-// 	}
+	if proposal.ExecutionState.Executed != 0 {
+		panic("ALREADY_EXECUTED")
+	}
 
-// 	if proposal.ExecutionState.Canceled != 0 {
-// 		panic("PROPOSAL_CANCELED")
-// 	}
+	if proposal.ExecutionState.Canceled != 0 {
+		panic("PROPOSAL_CANCELED")
+	}
 
-// 	timestampCurrent := uint64(timeNow().Unix())
-// 	if timestampCurrent == 0 {
-// 		panic("TIMESTAMP_ZERO")
-// 	}
+	timestampCurrent := uint64(timeNow().Unix())
+	if timestampCurrent == 0 {
+		panic("TIMESTAMP_ZERO")
+	}
 
-// 	config := GetConfigVersion(proposal.ConfigVersion)
-// 	votingEnd := proposal.ExecutionState.Created + config.VotingStartDelay + config.VotingPeriod
-// 	if timestampCurrent < votingEnd {
-// 		panic("VOTING_NOT_ENDED")
-// 	}
+	config := GetConfigVersion(proposal.ConfigVersion)
+	votingEnd := proposal.ExecutionState.Created + config.VotingStartDelay + config.VotingPeriod
+	if timestampCurrent < votingEnd {
+		panic("VOTING_NOT_ENDED")
+	}
 
-// 	windowStart := votingEnd + config.ExecutionDelay
-// 	if timestampCurrent < windowStart {
-// 		panic("EXECUTION_WINDOW_NOT_STARTED")
-// 	}
+	windowStart := votingEnd + config.ExecutionDelay
+	if timestampCurrent < windowStart {
+		panic("EXECUTION_WINDOW_NOT_STARTED")
+	}
 
-// 	windowEnd := windowStart + config.ExecutionWindow
-// 	if timestampCurrent >= windowEnd {
-// 		panic("EXECUTION_WINDOW_OVER")
-// 	}
+	windowEnd := windowStart + config.ExecutionWindow
+	if timestampCurrent >= windowEnd {
+		panic("EXECUTION_WINDOW_OVER")
+	}
 
-// 	if proposal.Yea.Cmp(config.Quorum) < 0 {
-// 		panic("QUORUM_NOT_MET")
-// 	}
+	if proposal.Yea.Cmp(config.Quorum) < 0 {
+		panic("QUORUM_NOT_MET")
+	}
 
-// 	if proposal.Yea.Cmp(proposal.Nay) < 0 {
-// 		panic("NO_MAJORITY")
-// 	}
+	if proposal.Yea.Cmp(proposal.Nay) < 0 {
+		panic("NO_MAJORITY")
+	}
 
-// 	proposal.ExecutionState.Executed = timestampCurrent
-// 	gGovernor.proposals[id] = proposal
+	proposal.ExecutionState.Executed = timestampCurrent
+	gGovernor.proposals[id] = proposal
 
-// 	results := make([][]byte, 0, len(calls))
-// 	for _, call := range calls {
-// 		result := executeCall(call)
-// 		results = append(results, result)
-// 	}
+	results := make([][]byte, 0, len(calls))
+	for _, call := range calls {
+		result := executeCall(call)
+		results = append(results, result)
+	}
 
-// 	std.Emit(
-// 		"Executed",
-// 		"id", string(id[:]),
-// 	)
+	std.Emit(
+		"Executed",
+		"id", string(id[:]),
+	)
 
-// 	return results
-// }
+	return results
+}
 
 // registry stores registered functions
 var registry = make(map[uint64]CallFunction)

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"gno.land/p/demo/uint256"
 	"gno.land/p/demo/ufmt"
+	"gno.land/p/demo/uint256"
 )
 
 // MockStaker is a mock implementation of IStakerDispatcher for testing
@@ -434,141 +434,141 @@ func TestVote(t *testing.T) {
 }
 
 func TestCancel(t *testing.T) {
-    mockStaker := &MockStaker{
-        averageDelegated: uint256.NewUint(1000),
-    }
+	mockStaker := &MockStaker{
+		averageDelegated: uint256.NewUint(1000),
+	}
 
-    config := Config{
-        VotingStartDelay:              100,
-        VotingPeriod:                  1000,
-        VotingWeightSmoothingDuration: 100,
-        Quorum:                        uint256.NewUint(500),
-        ProposalCreationThreshold:     uint256.NewUint(100),
-        ExecutionDelay:                100,
-        ExecutionWindow:               1000,
-    }
+	config := Config{
+		VotingStartDelay:              100,
+		VotingPeriod:                  1000,
+		VotingWeightSmoothingDuration: 100,
+		Quorum:                        uint256.NewUint(500),
+		ProposalCreationThreshold:     uint256.NewUint(100),
+		ExecutionDelay:                100,
+		ExecutionWindow:               1000,
+	}
 
-    Init(mockStaker, config)
+	Init(mockStaker, config)
 
-    calls := []Call{
-        {
-            To:       std.Address("test_address"),
-            Selector: 1,
-            Calldata: []byte("test_data"),
-        },
-    }
+	calls := []Call{
+		{
+			To:       std.Address("test_address"),
+			Selector: 1,
+			Calldata: []byte("test_data"),
+		},
+	}
 
-    id, _ := Propose(calls)
+	id, _ := Propose(calls)
 
-    t.Run("Successful cancel by proposer", func(t *testing.T) {
-        Cancel(id)
+	t.Run("Successful cancel by proposer", func(t *testing.T) {
+		Cancel(id)
 
-        proposal := gGovernor.proposals[id]
-        if proposal.ExecutionState.Canceled == 0 {
-            t.Errorf("Proposal was not canceled")
-        }
-    })
+		proposal := gGovernor.proposals[id]
+		if proposal.ExecutionState.Canceled == 0 {
+			t.Errorf("Proposal was not canceled")
+		}
+	})
 
-    t.Run("Cancel already canceled proposal", func(t *testing.T) {
-        defer func() {
-            if r := recover(); r == nil {
-                t.Errorf("The code did not panic")
-            } else if r != "ALREADY_CANCELED" {
-                t.Errorf("Unexpected panic: %v", r)
-            }
-        }()
+	t.Run("Cancel already canceled proposal", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("The code did not panic")
+			} else if r != "ALREADY_CANCELED" {
+				t.Errorf("Unexpected panic: %v", r)
+			}
+		}()
 
-        Cancel(id)
-    })
+		Cancel(id)
+	})
 
-    t.Run("Cancel after voting started", func(t *testing.T) {
-        id, _ := Propose(calls)
+	t.Run("Cancel after voting started", func(t *testing.T) {
+		id, _ := Propose(calls)
 
-        // Set the current time to be after voting start
-        currentTime := gGovernor.proposals[id].ExecutionState.Created + config.VotingStartDelay + 1
-        origTimeNow := timeNow
-        timeNow = func() time.Time { return time.Unix(int64(currentTime), 0) }
-        defer func() { timeNow = origTimeNow }()
+		// Set the current time to be after voting start
+		currentTime := gGovernor.proposals[id].ExecutionState.Created + config.VotingStartDelay + 1
+		origTimeNow := timeNow
+		timeNow = func() time.Time { return time.Unix(int64(currentTime), 0) }
+		defer func() { timeNow = origTimeNow }()
 
-        defer func() {
-            if r := recover(); r == nil {
-                t.Errorf("The code did not panic")
-            } else if r != "VOTING_STARTED" {
-                t.Errorf("Unexpected panic: %v", r)
-            }
-        }()
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("The code did not panic")
+			} else if r != "VOTING_STARTED" {
+				t.Errorf("Unexpected panic: %v", r)
+			}
+		}()
 
-        Cancel(id)
-    })
+		Cancel(id)
+	})
 }
 
 func TestCancelByNonProposer(t *testing.T) {
-    setupGovernor := func() ([32]byte, *MockStaker) {
-        mockStaker := &MockStaker{
-            averageDelegated: uint256.NewUint(1000),
-        }
+	setupGovernor := func() ([32]byte, *MockStaker) {
+		mockStaker := &MockStaker{
+			averageDelegated: uint256.NewUint(1000),
+		}
 
-        config := Config{
-            VotingStartDelay:              100,
-            VotingPeriod:                  1000,
-            VotingWeightSmoothingDuration: 100,
-            Quorum:                        uint256.NewUint(500),
-            ProposalCreationThreshold:     uint256.NewUint(100),
-            ExecutionDelay:                100,
-            ExecutionWindow:               1000,
-        }
+		config := Config{
+			VotingStartDelay:              100,
+			VotingPeriod:                  1000,
+			VotingWeightSmoothingDuration: 100,
+			Quorum:                        uint256.NewUint(500),
+			ProposalCreationThreshold:     uint256.NewUint(100),
+			ExecutionDelay:                100,
+			ExecutionWindow:               1000,
+		}
 
-        Init(mockStaker, config)
+		Init(mockStaker, config)
 
-        calls := []Call{
-            {
-                To:       std.Address("test_address"),
-                Selector: 1,
-                Calldata: []byte("test_data"),
-            },
-        }
+		calls := []Call{
+			{
+				To:       std.Address("test_address"),
+				Selector: 1,
+				Calldata: []byte("test_data"),
+			},
+		}
 
-        id, _ := Propose(calls)
-        return id, mockStaker
-    }
+		id, _ := Propose(calls)
+		return id, mockStaker
+	}
 
-    // t.Run("Cancel by non-proposer with sufficient stake", func(t *testing.T) {
+	// t.Run("Cancel by non-proposer with sufficient stake", func(t *testing.T) {
 	// 	t.Skip()
-    //     id, _ := setupGovernor()
+	//     id, _ := setupGovernor()
 
-    //     // Change the caller
-    //     origCaller := std.GetOrigCaller
-    //     std.GetOrigCaller = func() std.Address { return std.Address("non_proposer") }
-    //     defer func() { std.GetOrigCaller = origCaller }()
+	//     // Change the caller
+	//     origCaller := std.GetOrigCaller
+	//     std.GetOrigCaller = func() std.Address { return std.Address("non_proposer") }
+	//     defer func() { std.GetOrigCaller = origCaller }()
 
-    //     defer func() {
-    //         if r := recover(); r == nil {
-    //             t.Errorf("The code did not panic")
-    //         } else if r != "NOT_PROPOSER" {
-    //             t.Errorf("Unexpected panic: %v", r)
-    //         }
-    //     }()
+	//     defer func() {
+	//         if r := recover(); r == nil {
+	//             t.Errorf("The code did not panic")
+	//         } else if r != "NOT_PROPOSER" {
+	//             t.Errorf("Unexpected panic: %v", r)
+	//         }
+	//     }()
 
-    //     Cancel(id)
-    // })
+	//     Cancel(id)
+	// })
 
-    // t.Run("Cancel by non-proposer with insufficient stake", func(t *testing.T) {
-    //     id, mockStaker := setupGovernor()
+	// t.Run("Cancel by non-proposer with insufficient stake", func(t *testing.T) {
+	//     id, mockStaker := setupGovernor()
 
-    //     // Change the caller and lower the proposer's stake
-    //     origCaller := std.GetOrigCaller
-    //     std.GetOrigCaller = func() std.Address { return std.Address("non_proposer") }
-    //     defer func() { std.GetOrigCaller = origCaller }()
+	//     // Change the caller and lower the proposer's stake
+	//     origCaller := std.GetOrigCaller
+	//     std.GetOrigCaller = func() std.Address { return std.Address("non_proposer") }
+	//     defer func() { std.GetOrigCaller = origCaller }()
 
-    //     mockStaker.averageDelegated = uint256.NewUint(50) // Below threshold
+	//     mockStaker.averageDelegated = uint256.NewUint(50) // Below threshold
 
-    //     Cancel(id)
+	//     Cancel(id)
 
-    //     proposal := gGovernor.proposals[id]
-    //     if proposal.ExecutionState.Canceled == 0 {
-    //         t.Errorf("Proposal was not canceled")
-    //     }
-    // })
+	//     proposal := gGovernor.proposals[id]
+	//     if proposal.ExecutionState.Canceled == 0 {
+	//         t.Errorf("Proposal was not canceled")
+	//     }
+	// })
 }
 
 func TestGetConfigVersion(t *testing.T) {
@@ -629,89 +629,186 @@ func TestGetConfigVersion(t *testing.T) {
 }
 
 func TestExecuteCall(t *testing.T) {
-    tests := []struct {
-        name     string
-        selector uint64
-        calldata []byte
-        register func(uint64)
-        expected []byte
-        wantErr  bool
-    }{
-        {
-            name:     "Simple concatenation",
-            selector: 1,
-            calldata: []byte("World"),
-            register: func(selector uint64) {
-                RegisterFunction(selector, func(data []byte) ([]byte, error) {
-                    return append([]byte("Hello, "), data...), nil
-                })
-            },
-            expected: []byte("Hello, World"),
-            wantErr:  false,
-        },
-        {
-            name:     "Uppercase conversion",
-            selector: 2,
-            calldata: []byte("lowercase"),
-            register: func(selector uint64) {
-                RegisterFunction(selector, func(data []byte) ([]byte, error) {
-                    return bytes.ToUpper(data), nil
-                })
-            },
-            expected: []byte("LOWERCASE"),
-            wantErr:  false,
-        },
-        {
-            name:     "Error case",
-            selector: 3,
-            calldata: []byte("error"),
-            register: func(selector uint64) {
-                RegisterFunction(selector, func(data []byte) ([]byte, error) {
-                    return nil, errors.New("mock error")
-                })
-            },
-            expected: nil,
-            wantErr:  true,
-        },
-        {
-            name:     "Unregistered function",
-            selector: 4,
-            calldata: []byte("test"),
-            register: func(selector uint64) {
-                // Don't register any function
-            },
-            expected: nil,
-            wantErr:  true,
-        },
-    }
+	tests := []struct {
+		name     string
+		selector uint64
+		calldata []byte
+		register func(uint64)
+		expected []byte
+		wantErr  bool
+	}{
+		{
+			name:     "Simple concatenation",
+			selector: 1,
+			calldata: []byte("World"),
+			register: func(selector uint64) {
+				RegisterFunction(selector, func(data []byte) ([]byte, error) {
+					return append([]byte("Hello, "), data...), nil
+				})
+			},
+			expected: []byte("Hello, World"),
+			wantErr:  false,
+		},
+		{
+			name:     "Uppercase conversion",
+			selector: 2,
+			calldata: []byte("lowercase"),
+			register: func(selector uint64) {
+				RegisterFunction(selector, func(data []byte) ([]byte, error) {
+					return bytes.ToUpper(data), nil
+				})
+			},
+			expected: []byte("LOWERCASE"),
+			wantErr:  false,
+		},
+		{
+			name:     "Error case",
+			selector: 3,
+			calldata: []byte("error"),
+			register: func(selector uint64) {
+				RegisterFunction(selector, func(data []byte) ([]byte, error) {
+					return nil, errors.New("mock error")
+				})
+			},
+			expected: nil,
+			wantErr:  true,
+		},
+		{
+			name:     "Unregistered function",
+			selector: 4,
+			calldata: []byte("test"),
+			register: func(selector uint64) {
+				// Don't register any function
+			},
+			expected: nil,
+			wantErr:  true,
+		},
+	}
 
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            registry = make(map[uint64]CallFunction)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			registry = make(map[uint64]CallFunction)
 
-            tt.register(tt.selector)
+			tt.register(tt.selector)
 
-            call := Call{
-                To:       std.Address("test_address"),
-                Selector: tt.selector,
-                Calldata: tt.calldata,
-            }
+			call := Call{
+				To:       std.Address("test_address"),
+				Selector: tt.selector,
+				Calldata: tt.calldata,
+			}
 
-            if tt.wantErr {
-                defer func() {
-                    if r := recover(); r == nil {
-                        t.Errorf("executeCall() did not panic as expected")
-                    }
-                }()
-            }
+			if tt.wantErr {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("executeCall() did not panic as expected")
+					}
+				}()
+			}
 
-            result := executeCall(call)
+			result := executeCall(call)
 
-            if !tt.wantErr {
-                if !bytes.Equal(result, tt.expected) {
-                    t.Errorf("executeCall() = %v, want %v", result, tt.expected)
-                }
-            }
-        })
-    }
+			if !tt.wantErr {
+				if !bytes.Equal(result, tt.expected) {
+					t.Errorf("executeCall() = %v, want %v", result, tt.expected)
+				}
+			}
+		})
+	}
+}
+
+func TestExecute(t *testing.T) {
+	RegisterFunction(1, func(data []byte) ([]byte, error) {
+		return append([]byte("Executed: "), data...), nil
+	})
+
+	setupGovernor := func() ([32]byte, []Call, Config) {
+		mockStaker := &MockStaker{
+			averageDelegated: uint256.NewUint(1000),
+		}
+
+		config := Config{
+			VotingStartDelay:              100,
+			VotingPeriod:                  1000,
+			VotingWeightSmoothingDuration: 100,
+			Quorum:                        uint256.NewUint(500),
+			ProposalCreationThreshold:     uint256.NewUint(100),
+			ExecutionDelay:                100,
+			ExecutionWindow:               1000,
+		}
+
+		Init(mockStaker, config)
+
+		calls := []Call{
+			{
+				To:       std.Address("test_address"),
+				Selector: 1,
+				Calldata: []byte("test_data"),
+			},
+		}
+
+		id, _ := Propose(calls)
+
+		// Set the time to be after voting has started
+		proposal := gGovernor.proposals[id]
+		votingStartTime := proposal.ExecutionState.Created + config.VotingStartDelay + 1
+		origTimeNow := timeNow
+		timeNow = func() time.Time { return time.Unix(int64(votingStartTime), 0) }
+
+		// Set up a successful vote
+		Vote(id, true)
+
+		// Reset the time function
+		timeNow = origTimeNow
+
+		return id, calls, config
+	}
+
+	t.Run("Successful execution", func(t *testing.T) {
+		id, calls, config := setupGovernor()
+
+		// Set the current time to be within the execution window
+		proposal := gGovernor.proposals[id]
+		currentTime := proposal.ExecutionState.Created + config.VotingStartDelay + config.VotingPeriod + config.ExecutionDelay + 1
+		origTimeNow := timeNow
+		timeNow = func() time.Time { return time.Unix(int64(currentTime), 0) }
+		defer func() { timeNow = origTimeNow }()
+
+		results := Execute(id, calls)
+
+		if len(results) != len(calls) {
+			t.Errorf("Expected %d results, got %d", len(calls), len(results))
+		}
+
+		executedProposal := gGovernor.proposals[id]
+		if executedProposal.ExecutionState.Executed == 0 {
+			t.Errorf("Proposal was not marked as executed")
+		}
+
+		// Check the result of the executed function
+		expectedResult := []byte("Executed: test_data")
+		if !bytes.Equal(results[0], expectedResult) {
+			t.Errorf("Expected result %s, got %s", expectedResult, results[0])
+		}
+	})
+
+	t.Run("Execution before voting ends", func(t *testing.T) {
+		id, calls, config := setupGovernor()
+
+		// Set the current time to be before voting ends
+		proposal := gGovernor.proposals[id]
+		currentTime := proposal.ExecutionState.Created + config.VotingStartDelay + config.VotingPeriod - 1
+		origTimeNow := timeNow
+		timeNow = func() time.Time { return time.Unix(int64(currentTime), 0) }
+		defer func() { timeNow = origTimeNow }()
+
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("The code did not panic")
+			} else if r != "VOTING_NOT_ENDED" {
+				t.Errorf("Unexpected panic: %v", r)
+			}
+		}()
+
+		Execute(id, calls)
+	})
 }
