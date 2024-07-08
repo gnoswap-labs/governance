@@ -17,7 +17,9 @@ var (
 	gGovernor *Governor
 )
 
-// Init initializes the governor contract
+// Init initializes the governor contract with the given staker and configuration.
+// It creates a new Governor instance and sets it as the global governor.
+// This function should be called only once at the beginning of the contract's lifecycle.
 func Init(staker IStakerDispatcher, config Config) {
 	gGovernor = &Governor{
 		staker:                   staker,
@@ -31,7 +33,9 @@ func Init(staker IStakerDispatcher, config Config) {
 	}
 }
 
-// Propose proposes a new proposal
+// Propose creates a new proposal with the given set of calls.
+// It checks if the proposer is eligible to create a proposal and if they don't have an active proposal.
+// Returns the proposal ID and an error if the proposal creation fails.
 func Propose(calls []Call) ([32]byte, error) {
 	if gGovernor == nil {
 		panic("Governor not initialized")
@@ -93,6 +97,8 @@ func Propose(calls []Call) ([32]byte, error) {
 	return id, nil
 }
 
+// Describe adds a description to an existing proposal.
+// Only the original proposer can add a description, and it must be done before the proposal is executed or canceled.
 func Describe(id [32]byte, description string) {
 	if gGovernor == nil {
 		panic("Governor not initialized")
@@ -125,6 +131,7 @@ func Describe(id [32]byte, description string) {
 
 // ProposeAndDescribe combines the functionality of Propose and Describe.
 // It creates a new proposal and immediately adds a description to it.
+// Returns the proposal ID and an error if either the proposal creation or description fails.
 func ProposeAndDescribe(calls []Call, desc string) ([32]byte, error) {
 	if gGovernor == nil {
 		panic("Governor not initialized")
@@ -142,7 +149,9 @@ func ProposeAndDescribe(calls []Call, desc string) ([32]byte, error) {
 	return id, nil
 }
 
-// Vote allows a user to vote on a given proposal
+// Vote allows a user to vote on a given proposal.
+// The user's voting weight is determined by their average delegated stake over a specified period.
+// Panics if the voting conditions are not met (e.g., voting period hasn't started, has ended, or user has already voted).
 func Vote(id [32]byte, yes bool) {
 	if gGovernor == nil {
 		panic("Governor not initialized")
@@ -207,6 +216,7 @@ func Vote(id [32]byte, yes bool) {
 
 // Cancel cancels the proposal with the given ID.
 // Only callable by the proposer or if the proposer's stake has fallen below the threshold.
+// Panics if the proposal doesn't exist, is already canceled, or if voting has already started.
 func Cancel(id [32]byte) {
 	if gGovernor == nil {
 		panic("Governor not initialized")
@@ -247,7 +257,10 @@ func Cancel(id [32]byte) {
 	)
 }
 
-// Execute excutes the given proposal.
+// Execute executes the given proposal.
+// It checks various conditions such as voting period, execution window, quorum, and majority.
+// Returns the results of the executed calls.
+// Panics if any of the execution conditions are not met.
 func Execute(id [32]byte, calls []Call) [][]byte {
 	if gGovernor == nil {
 		panic("Governor not initialized")
@@ -320,7 +333,8 @@ func Execute(id [32]byte, calls []Call) [][]byte {
 // registry stores registered functions
 var registry = make(map[uint64]CallFunction)
 
-// RegisterFunction registers a function with the given selector
+// RegisterFunction registers a function with the given selector.
+// This allows the governor to execute custom functions during proposal execution.
 func RegisterFunction(selector uint64, fn CallFunction) {
 	registry[selector] = fn
 }
@@ -340,7 +354,8 @@ func executeCall(call Call) []byte {
 	return result
 }
 
-// GetConfigVersion returns the configuration for a specific version
+// GetConfigVersion returns the configuration for a specific version.
+// If version is 0, it returns the current configuration.
 func GetConfigVersion(version uint64) Config {
 	if gGovernor == nil {
 		panic("Governor not initialized")
@@ -356,6 +371,33 @@ func GetConfigVersion(version uint64) Config {
 	}
 
 	return config
+}
+
+// Reconfigure updates the Governor's configuration.
+// This function can only be called by the Governor itself (via a proposal).
+// Returns the new configuration version number.
+func Reconfigure(newConfig Config) uint64 {
+	if gGovernor == nil {
+		panic("Governor not initialized")
+	}
+
+	checkSelfCall()
+
+	gGovernor.latestConfigVersion++
+	gGovernor.configVersions[gGovernor.latestConfigVersion] = newConfig
+	gGovernor.config = newConfig
+
+	// TODO: emit
+
+	return gGovernor.latestConfigVersion
+}
+
+// checkSelfCall ensures that the function is called by the Governor itself.
+// Panics if the caller is not the Governor contract.
+func checkSelfCall() {
+	if std.GetOrigCaller() != std.GetOrigPkgAddr() {
+		panic("NOT_SELF_CALL")
+	}
 }
 
 // getProposalID generates a unique proposal ID based on the contract address and nonce
