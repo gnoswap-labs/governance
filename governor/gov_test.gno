@@ -2,6 +2,7 @@ package governor
 
 import (
 	"bytes"
+	"errors"
 	"std"
 	"testing"
 	"time"
@@ -625,4 +626,92 @@ func TestGetConfigVersion(t *testing.T) {
 			t.Errorf("Expected new config, got different config")
 		}
 	})
+}
+
+func TestExecuteCall(t *testing.T) {
+    tests := []struct {
+        name     string
+        selector uint64
+        calldata []byte
+        register func(uint64)
+        expected []byte
+        wantErr  bool
+    }{
+        {
+            name:     "Simple concatenation",
+            selector: 1,
+            calldata: []byte("World"),
+            register: func(selector uint64) {
+                RegisterFunction(selector, func(data []byte) ([]byte, error) {
+                    return append([]byte("Hello, "), data...), nil
+                })
+            },
+            expected: []byte("Hello, World"),
+            wantErr:  false,
+        },
+        {
+            name:     "Uppercase conversion",
+            selector: 2,
+            calldata: []byte("lowercase"),
+            register: func(selector uint64) {
+                RegisterFunction(selector, func(data []byte) ([]byte, error) {
+                    return bytes.ToUpper(data), nil
+                })
+            },
+            expected: []byte("LOWERCASE"),
+            wantErr:  false,
+        },
+        {
+            name:     "Error case",
+            selector: 3,
+            calldata: []byte("error"),
+            register: func(selector uint64) {
+                RegisterFunction(selector, func(data []byte) ([]byte, error) {
+                    return nil, errors.New("mock error")
+                })
+            },
+            expected: nil,
+            wantErr:  true,
+        },
+        {
+            name:     "Unregistered function",
+            selector: 4,
+            calldata: []byte("test"),
+            register: func(selector uint64) {
+                // Don't register any function
+            },
+            expected: nil,
+            wantErr:  true,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            registry = make(map[uint64]CallFunction)
+
+            tt.register(tt.selector)
+
+            call := Call{
+                To:       std.Address("test_address"),
+                Selector: tt.selector,
+                Calldata: tt.calldata,
+            }
+
+            if tt.wantErr {
+                defer func() {
+                    if r := recover(); r == nil {
+                        t.Errorf("executeCall() did not panic as expected")
+                    }
+                }()
+            }
+
+            result := executeCall(call)
+
+            if !tt.wantErr {
+                if !bytes.Equal(result, tt.expected) {
+                    t.Errorf("executeCall() = %v, want %v", result, tt.expected)
+                }
+            }
+        })
+    }
 }
