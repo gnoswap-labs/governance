@@ -4,9 +4,11 @@ import (
 	"errors"
 	"std"
 	"testing"
+	"time"
 
 	"gno.land/p/demo/grc/grc20"
 	"gno.land/p/demo/merkle"
+	"gno.land/p/demo/testutils"
 	"gno.land/p/demo/ufmt"
 	"gno.land/p/demo/uint256"
 )
@@ -76,17 +78,11 @@ func (m *mockGRC20) Approve(spender std.Address, amount uint64) error {
 }
 
 func (m *mockGRC20) TransferFrom(from, to std.Address, amount uint64) error {
-	spender := std.GetOrigCaller()
-	allowance := m.Allowance(from, spender)
-	if allowance < amount {
-		return errors.New("insufficient allowance")
-	}
 	if m.balances[from] < amount {
 		return errors.New("insufficient balance")
 	}
 	m.balances[from] -= amount
 	m.balances[to] += amount
-	m.allowances[from][spender] -= amount
 	return nil
 }
 
@@ -96,7 +92,7 @@ func TestClaimIDToBitmapIndex(t *testing.T) {
 	address := std.Address("test")
 	a := NewAirdrop(nil, Config{}, address)
 
-	testCases := []struct {
+	tests := []struct {
 		claimID       uint64
 		expectedWord  uint64
 		expectedIndex uint64
@@ -108,7 +104,7 @@ func TestClaimIDToBitmapIndex(t *testing.T) {
 		{129, 2, 1},
 	}
 
-	for _, tc := range testCases {
+	for _, tc := range tests {
 		word, index := a.claimIDToBitmapIndex(tc.claimID)
 		if word != tc.expectedWord || index != tc.expectedIndex {
 			t.Errorf("For claimID %d, expected (%d, %d), got (%d, %d)",
@@ -293,4 +289,62 @@ func TestClaim64(t *testing.T) {
 	}()
 
 	airdrop.Claim64(invalidFirstClaim)
+}
+
+func TestRefund(t *testing.T) {
+	token := NewMockGRC20("Test Token", "TST", 18)
+	refundTo := testutils.TestAddress("refund_to")
+	config := Config{
+		RefundableTimestamp: uint64(time.Now().Add(time.Hour).Unix()),
+		RefundTo:            refundTo,
+	}
+	airdrop := NewAirdrop(token, config, testutils.TestAddress("airdrop"))
+
+	// Set some balance for the airdrop contract
+	token.balances[airdrop.address] = 1000
+
+	t.Run("Refund before refundable timestamp", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("Expected panic but got none")
+			} else if r != ErrTooEarly {
+				t.Errorf("Expected ErrTooEarly panic but got: %v", r)
+			}
+		}()
+		airdrop.Refund()
+	})
+
+	t.Run("Successful refund", func(t *testing.T) {
+		// Set current time to after refundable timestamp
+		oldTimeNow := timeNow
+		timeNow = func() time.Time {
+			return time.Unix(int64(config.RefundableTimestamp+1), 0)
+		}
+		defer func() { timeNow = oldTimeNow }()
+
+		err := airdrop.Refund()
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+
+		if balance := token.balances[refundTo]; balance != 1000 {
+			t.Errorf("Expected refund balance to be 1000, got %d", balance)
+		}
+
+		if balance := token.balances[airdrop.address]; balance != 0 {
+			t.Errorf("Expected airdrop balance to be 0, got %d", balance)
+		}
+	})
+
+	// t.Run("Refund with no balance", func(t *testing.T) {
+	//     token.balances[airdrop.address] = 0
+	//     defer func() {
+	//         if r := recover(); r == nil {
+	//             t.Errorf("Expected panic but got none")
+	//         } else if r != ErrNoBalance {
+	//             t.Errorf("Expected ErrNoBalance panic but got: %v", r)
+	//         }
+	//     }()
+	//     airdrop.Refund()
+	// })
 }

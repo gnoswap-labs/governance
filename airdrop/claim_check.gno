@@ -30,22 +30,22 @@ func NewAirdropClaimCheck() *AirdropClaimCheck {
 }
 
 func (acc *AirdropClaimCheck) Check(claims []CheckParams) []CheckResult {
-    results := make([]CheckResult, 0, len(claims))
+	results := make([]CheckResult, 0, len(claims))
 
-    for _, claim := range claims {
-        claimed := claim.Airdrop.IsClaimed(claim.ClaimID)
+	for _, claim := range claims {
+		claimed := claim.Airdrop.IsClaimed(claim.ClaimID)
 
-        // get the token balance of the airdrop contract
-        airdeopAddr := claim.Airdrop.GetAddress()
-        balance := claim.Airdrop.token.BalanceOf(airdeopAddr)
+		// get the token balance of the airdrop contract
+		airdeopAddr := claim.Airdrop.GetAddress()
+		balance := claim.Airdrop.token.BalanceOf(airdeopAddr)
 
-        funded := u256.NewUint(balance).Cmp(claim.Amount) >= 0
+		funded := u256.NewUint(balance).Cmp(claim.Amount) >= 0
 
-        results = append(results, CheckResult{
-            Claimed: claimed,
-            Funded:  funded,
-        })
-    }
+		results = append(results, CheckResult{
+			Claimed: claimed,
+			Funded:  funded,
+		})
+	}
 
-    return results
+	return results
 }
