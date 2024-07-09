@@ -37,12 +37,7 @@ func (acc *AirdropClaimCheck) Check(claims []CheckParams) []CheckResult {
 
 		// get the token balance of the airdrop contract
 		airdeopAddr := claim.Airdrop.GetAddress()
-		balance, err := claim.Airdrop.token.BalanceOf(airdeopAddr)
-		if err != nil {
-			// TODO: handle error
-			results = append(results, CheckResult{Claimed: claimed, Funded: false})
-			continue
-		}
+		balance := claim.Airdrop.token.BalanceOf(airdeopAddr)
 
 		funded := u256.NewUint(balance).Cmp(claim.Amount) >= 0
 

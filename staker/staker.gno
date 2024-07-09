@@ -25,7 +25,7 @@ type DelegationHistory struct {
 
 // staking contract
 type Staker struct {
-	token             grc20.IGRC20
+	token             grc20.Token
 	delegations       map[std.Address]*u256.Uint
 	delegationHistory map[std.Address][]DelegationHistory
 	totalStaked       *u256.Uint
@@ -33,7 +33,7 @@ type Staker struct {
 
 var gStaker *Staker
 
-func Init(token grc20.IGRC20) {
+func Init(token grc20.Token) {
 	gStaker = &Staker{
 		token:             token,
 		delegations:       make(map[std.Address]*u256.Uint),
@@ -47,16 +47,13 @@ func StakeAmount(delegate std.Address, amount *u256.Uint) error {
 	caller := std.GetOrigCaller()
 
 	// Check if the caller has enough balance
-	balance, err := gStaker.token.BalanceOf(caller)
-	if err != nil {
-		panic(err)
-	}
+	balance := gStaker.token.BalanceOf(caller)
 	if u256.NewUint(balance).Cmp(amount) < 0 {
 		panic(ErrInsufficientBalance)
 	}
 
 	// Transfer tokens from caller to this contract
-	err = gStaker.token.TransferFrom(caller, std.GetOrigPkgAddr(), amount.Uint64())
+	err := gStaker.token.TransferFrom(caller, std.GetOrigPkgAddr(), amount.Uint64())
 	if err != nil {
 		panic(err)
 	}

@@ -3,6 +3,7 @@ package airdrop
 import (
 	"errors"
 	"std"
+	"time"
 
 	"gno.land/p/demo/grc/grc20"
 	"gno.land/p/demo/uint256"
@@ -12,7 +13,12 @@ var (
 	ErrInvalidClaimsCount  = errors.New("INVALID_CLAIMS_COUNT")
 	ErrFirstClaimIsNot64   = errors.New("FIRST_CLAIM_MUST_BE_MULT_64")
 	ErrInsufficientBalance = errors.New("INSUFFICIENT_BALANCE")
+	ErrRefundNotAllowed    = errors.New("refund not allowed")
+	ErrTooEarly            = errors.New("too early")
+	ErrNoBalance           = errors.New("no balance to refund")
 )
+
+var timeNow = time.Now
 
 // Claim represents a single airdrop claim
 type Claim struct {
@@ -29,14 +35,14 @@ type Config struct {
 
 // Airdrop represents the airdrop contract
 type Airdrop struct {
-	token         grc20.IGRC20
+	token         grc20.Token
 	config        Config
 	claimedBitmap map[uint64]uint64
 	address       std.Address
 }
 
 // NewAirdrop creates a new Airdrop instance
-func NewAirdrop(token grc20.IGRC20, config Config, addr std.Address) *Airdrop {
+func NewAirdrop(token grc20.Token, config Config, addr std.Address) *Airdrop {
 	return &Airdrop{
 		token:         token,
 		config:        config,
@@ -74,15 +80,12 @@ func (a *Airdrop) Claim(claim Claim) (bool, error) {
 	}
 
 	// check if the airdrop contract has enough balance to transfer
-	airdropBalance, err := a.token.BalanceOf(std.GetOrigCaller())
-	if err != nil {
-		panic(err)
-	}
+	airdropBalance := a.token.BalanceOf(std.GetOrigCaller())
 	if airdropBalance < claim.Amount.Uint64() {
 		panic(ErrInsufficientBalance)
 	}
 
-	err = a.token.Transfer(claim.Claimee, claim.Amount.Uint64())
+	err := a.token.Transfer(claim.Claimee, claim.Amount.Uint64())
 	if err != nil {
 		panic(err)
 	}
@@ -123,10 +126,7 @@ func (a *Airdrop) Claim64(claims []Claim) (uint8, error) {
 	}
 
 	// check has enough balance to transfer
-	airdropBalance, err := a.token.BalanceOf(std.GetOrigCaller())
-	if err != nil {
-		return 0, err
-	}
+	airdropBalance := a.token.BalanceOf(std.GetOrigCaller())
 	if airdropBalance < totalAmount {
 		panic(ErrInsufficientBalance)
 	}
@@ -152,6 +152,29 @@ func (a *Airdrop) Claim64(claims []Claim) (uint8, error) {
 
 	a.claimedBitmap[word] = bitmap
 	return claimedCount, nil
+}
+
+// Refund refunds the remaining tokens to the specified address after the refundable timestamp
+func (a *Airdrop) Refund() error {
+	if a.config.RefundableTimestamp == 0 {
+		panic(ErrRefundNotAllowed)
+	}
+
+	if uint64(timeNow().Unix()) < a.config.RefundableTimestamp {
+		panic(ErrTooEarly)
+	}
+
+	balance := a.token.BalanceOf(a.address)
+	if balance == 0 {
+		panic(ErrNoBalance)
+	}
+
+	err := a.token.TransferFrom(a.address, a.config.RefundTo, balance)
+	if err != nil {
+		panic(err)
+	}
+
+	return nil
 }
 
 // GetConfig returns the airdrop configuration
