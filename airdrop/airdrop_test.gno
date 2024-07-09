@@ -48,8 +48,8 @@ func (m *mockGRC20) TotalSupply() uint64 {
 	return m.totalSupply
 }
 
-func (m *mockGRC20) BalanceOf(account std.Address) (uint64, error) {
-	return m.balances[account], nil
+func (m *mockGRC20) BalanceOf(account std.Address) uint64 {
+	return m.balances[account]
 }
 
 func (m *mockGRC20) Transfer(to std.Address, amount uint64) error {
@@ -62,8 +62,8 @@ func (m *mockGRC20) Transfer(to std.Address, amount uint64) error {
 	return nil
 }
 
-func (m *mockGRC20) Allowance(owner, spender std.Address) (uint64, error) {
-	return m.allowances[owner][spender], nil
+func (m *mockGRC20) Allowance(owner, spender std.Address) uint64 {
+	return m.allowances[owner][spender]
 }
 
 func (m *mockGRC20) Approve(spender std.Address, amount uint64) error {
@@ -77,7 +77,7 @@ func (m *mockGRC20) Approve(spender std.Address, amount uint64) error {
 
 func (m *mockGRC20) TransferFrom(from, to std.Address, amount uint64) error {
 	spender := std.GetOrigCaller()
-	allowance, _ := m.Allowance(from, spender)
+	allowance := m.Allowance(from, spender)
 	if allowance < amount {
 		return errors.New("insufficient allowance")
 	}
@@ -167,11 +167,11 @@ func TestClaim(t *testing.T) {
 	}
 
 	// Check balances after claim
-	airdropBalance, _ := mockToken.BalanceOf(airdropAddress)
+	airdropBalance := mockToken.BalanceOf(airdropAddress)
 	if airdropBalance != 900000 {
 		t.Errorf("Expected airdrop balance to be 900000, got %d", airdropBalance)
 	}
-	claimeeBalance, _ := mockToken.BalanceOf(claimeeAddress)
+	claimeeBalance := mockToken.BalanceOf(claimeeAddress)
 	if claimeeBalance != 100000 {
 		t.Errorf("Expected claimee balance to be 100000, got %d", claimeeBalance)
 	}
@@ -230,12 +230,12 @@ func TestClaim64(t *testing.T) {
 	}
 
 	// Check balances after claims
-	airdropBalance, _ := mockToken.BalanceOf(airdropAddress)
+	airdropBalance := mockToken.BalanceOf(airdropAddress)
 	if airdropBalance != 936000 { // 1000000 - (64 * 1000)
 		t.Errorf("Expected airdrop balance to be 936000, got %d", airdropBalance)
 	}
 	for i := 0; i < 64; i++ {
-		claimeeBalance, _ := mockToken.BalanceOf(std.Address(ufmt.Sprintf("claimee%d", i)))
+		claimeeBalance := mockToken.BalanceOf(std.Address(ufmt.Sprintf("claimee%d", i)))
 		if claimeeBalance != 1000 {
 			t.Errorf("Expected claimee%d balance to be 1000, got %d", i, claimeeBalance)
 		}

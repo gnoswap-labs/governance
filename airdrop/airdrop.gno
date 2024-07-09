@@ -29,14 +29,14 @@ type Config struct {
 
 // Airdrop represents the airdrop contract
 type Airdrop struct {
-	token         grc20.IGRC20
+	token         grc20.Token
 	config        Config
 	claimedBitmap map[uint64]uint64
 	address       std.Address
 }
 
 // NewAirdrop creates a new Airdrop instance
-func NewAirdrop(token grc20.IGRC20, config Config, addr std.Address) *Airdrop {
+func NewAirdrop(token grc20.Token, config Config, addr std.Address) *Airdrop {
 	return &Airdrop{
 		token:         token,
 		config:        config,
@@ -74,15 +74,12 @@ func (a *Airdrop) Claim(claim Claim) (bool, error) {
 	}
 
 	// check if the airdrop contract has enough balance to transfer
-	airdropBalance, err := a.token.BalanceOf(std.GetOrigCaller())
-	if err != nil {
-		panic(err)
-	}
+	airdropBalance := a.token.BalanceOf(std.GetOrigCaller())
 	if airdropBalance < claim.Amount.Uint64() {
 		panic(ErrInsufficientBalance)
 	}
 
-	err = a.token.Transfer(claim.Claimee, claim.Amount.Uint64())
+	err := a.token.Transfer(claim.Claimee, claim.Amount.Uint64())
 	if err != nil {
 		panic(err)
 	}
@@ -123,10 +120,7 @@ func (a *Airdrop) Claim64(claims []Claim) (uint8, error) {
 	}
 
 	// check has enough balance to transfer
-	airdropBalance, err := a.token.BalanceOf(std.GetOrigCaller())
-	if err != nil {
-		return 0, err
-	}
+	airdropBalance := a.token.BalanceOf(std.GetOrigCaller())
 	if airdropBalance < totalAmount {
 		panic(ErrInsufficientBalance)
 	}
