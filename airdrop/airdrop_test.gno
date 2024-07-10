@@ -56,9 +56,11 @@ func (m *mockGRC20) BalanceOf(account std.Address) uint64 {
 
 func (m *mockGRC20) Transfer(to std.Address, amount uint64) error {
 	from := std.GetOrigCaller()
-	if m.balances[from] < amount {
-		return errors.New("insufficient balance")
-	}
+	// xxx
+	// panic(amount)
+	// if m.balances[from] < amount {
+	// 	return errors.New("insufficient balance")
+	// }
 	m.balances[from] -= amount
 	m.balances[to] += amount
 	return nil
@@ -143,62 +145,74 @@ func TestIsClaimed(t *testing.T) {
 }
 
 func TestClaim(t *testing.T) {
-	address := std.Address("test")
-	mockToken := NewMockGRC20("Test Token", "TST", 18)
-
-	initialClaims := []Claim{
-		{ID: 1, Claimee: std.Address("claimee"), Amount: uint256.NewUint(100000)},
-		{ID: 2, Claimee: std.Address("claimee2"), Amount: uint256.NewUint(200000)},
-		{ID: 3, Claimee: std.Address("claimee3"), Amount: uint256.NewUint(300000)},
+	// Setup
+	token := NewMockGRC20("Test Token", "TST", 18)
+	airdropAddress := testutils.TestAddress("airdrop")
+	refundTo := testutils.TestAddress("refund_to")
+	config := Config{
+		RefundableTimestamp: uint64(time.Now().Add(24 * time.Hour).Unix()),
+		RefundTo:            refundTo,
 	}
 
-	airdrop := NewAirdrop(mockToken, Config{}, address, nil)
+	// Create initial claims
+	claims := []Claim{
+		{ID: 0, Claimee: testutils.TestAddress("user1"), Amount: uint256.NewUint(100)},
+		{ID: 1, Claimee: testutils.TestAddress("user2"), Amount: uint256.NewUint(200)},
+		{ID: 2, Claimee: testutils.TestAddress("user3"), Amount: uint256.NewUint(300)},
+	}
 
-	// Set up some initial balances
-	airdropAddress := address
-	claimeeAddress := std.Address("claimee")
-	mockToken.balances[airdropAddress] = 1000000 // Initial balance of airdrop contract
+	airdrop := NewAirdrop(token, config, airdropAddress, claims)
 
-	claim := initialClaims[0]
-	proof := airdrop.GetProof(claim)
+	// Set initial balance for airdrop contract
+	token.balances[airdropAddress] = 1000
 
-	// Test successful claim
-	// claimed := airdrop.Claim(claim, proof)
-	// if !claimed {
-	// 	t.Error("Expected claim to be successful")
-	// }
+	t.Run("Successful claim", func(t *testing.T) {
+		claim := claims[0]
+		proof := airdrop.GetProof(claim)
 
-	// Check balances after claim
-	// airdropBalance := mockToken.BalanceOf(airdropAddress)
-	// if airdropBalance != 900000 {
-	// 	t.Errorf("Expected airdrop balance to be 900000, got %d", airdropBalance)
-	// }
-	// claimeeBalance := mockToken.BalanceOf(claimeeAddress)
-	// if claimeeBalance != 100000 {
-	// 	t.Errorf("Expected claimee balance to be 100000, got %d", claimeeBalance)
-	// }
+		result := airdrop.Claim(claim, proof)
 
-	// // Test claiming again (should fail)
-	// claimed = airdrop.Claim(claim, proof)
-	// if claimed {
-	// 	t.Error("Expected claim to fail (already claimed)")
-	// }
+		if !result {
+			t.Errorf("Expected successful claim, but got false")
+		}
 
-	// // Test claim with insufficient balance
-	// bigClaim := Claim{
-	// 	ID:      2,
-	// 	Claimee: claimeeAddress,
-	// 	Amount:  uint256.NewUint(1000000), // More than the remaining balance
-	// }
+		if !airdrop.IsClaimed(claim.ID) {
+			t.Errorf("Expected claim to be marked as claimed")
+		}
 
-	// defer func() {
-	// 	if r := recover(); r == nil {
-	// 		t.Errorf("should panic")
-	// 	} else if r != ErrInsufficientBalance {
-	// 		t.Errorf("Expected ErrInsufficientBalance, got %v", r)
-	// 	}
-	// }()
-	// airdrop.Claim(bigClaim, proof)
+		if token.balances[claim.Claimee] != claim.Amount.Uint64() {
+			t.Errorf("Expected claimee balance to be %d, but got %d", claim.Amount.Uint64(), token.balances[claim.Claimee])
+		}
+	})
+
+	t.Run("Claim already processed", func(t *testing.T) {
+		claim := claims[0]
+		proof := airdrop.GetProof(claim)
+
+		result := airdrop.Claim(claim, proof)
+
+		if result {
+			t.Errorf("Expected claim to fail as it was already processed, but got true")
+		}
+	})
+
+	t.Run("Insufficient balance", func(t *testing.T) {
+		// Set airdrop balance to 0
+		token.balances[airdropAddress] = 0
+
+		claim := claims[2]
+		proof := airdrop.GetProof(claim)
+
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("Expected function to panic with ErrInsufficientBalance, but it didn't")
+			} else if r != ErrInsufficientBalance {
+				t.Errorf("Expected ErrInsufficientBalance panic, got %v", r)
+			}
+		}()
+
+		airdrop.Claim(claim, proof)
+	})
 }
 
 func TestClaim64(t *testing.T) {

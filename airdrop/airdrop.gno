@@ -138,6 +138,12 @@ func (a *Airdrop) Claim(claim Claim, proof []merkle.Node) bool {
 	// Update the bitmap
 	a.claimedBitmap[word] = bitmap | mask
 
+	std.Emit("Claimed", 
+		"id", string(claim.ID),
+		"claimee", claim.Claimee.String(),
+		"amount", claim.Amount.ToString(),
+	)
+
 	return true
 }
 
