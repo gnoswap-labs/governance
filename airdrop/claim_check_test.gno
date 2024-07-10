@@ -14,7 +14,7 @@ func TestAirdropClaimCheck(t *testing.T) {
 
 	// Create an airdrop instance
 	airdropAddress := std.Address("airdrop_address")
-	airdrop := NewAirdrop(mockToken, Config{}, airdropAddress)
+	airdrop := NewAirdrop(mockToken, Config{}, airdropAddress, nil)
 
 	// Set up some initial balances
 	mockToken.balances[airdropAddress] = 1000000 // Initial balance of airdrop contract
