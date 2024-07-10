@@ -355,20 +355,38 @@ func TestRefund(t *testing.T) {
 	// })
 }
 
+func setupAirdrop() (*Airdrop, *mockGRC20) {
+    token := NewMockGRC20("Test Token", "TST", 18)
+    config := Config{
+        RefundableTimestamp: 0,
+        RefundTo:            std.Address("refund_to"),
+    }
+
+    initialClaims := []Claim{
+        {ID: 1, Claimee: std.Address("claimee1"), Amount: uint256.NewUint(100)},
+        {ID: 2, Claimee: std.Address("claimee2"), Amount: uint256.NewUint(200)},
+        {ID: 3, Claimee: std.Address("claimee3"), Amount: uint256.NewUint(300)},
+    }
+
+    airdrop := NewAirdrop(token, config, std.Address("airdrop"), initialClaims)
+    return airdrop, token
+}
+
+func TestRootConsistency(t *testing.T) {
+	airdrop, _ := setupAirdrop()
+	initialRoot := airdrop.snapshots[0].Root
+
+	newClaim := Claim{ID: 4, Claimee: std.Address("claimee4"), Amount: uint256.NewUint(400)}
+	airdrop.AddClaim(newClaim)
+
+	newRoot := airdrop.snapshots[1].Root
+	if initialRoot == newRoot {
+		t.Errorf("Expected new root to be different from initial root")
+	}
+}
+
 func TestAirdropWithMerkle(t *testing.T) {
-	token := NewMockGRC20("Test Token", "TST", 18)
-	config := Config{
-		RefundableTimestamp: 0,
-		RefundTo:            std.Address("refund_to"),
-	}
-
-	initialClaims := []Claim{
-		{ID: 1, Claimee: std.Address("claimee1"), Amount: uint256.NewUint(100)},
-		{ID: 2, Claimee: std.Address("claimee2"), Amount: uint256.NewUint(200)},
-		{ID: 3, Claimee: std.Address("claimee3"), Amount: uint256.NewUint(300)},
-	}
-
-	airdrop := NewAirdrop(token, config, std.Address("airdrop"), initialClaims)
+	airdrop, token := setupAirdrop()
 
 	// Test initial snapshot
 	if root := airdrop.GetLatestRoot(); root == "" {
