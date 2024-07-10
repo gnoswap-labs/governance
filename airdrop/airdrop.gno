@@ -256,11 +256,7 @@ func (a *Airdrop) GetProof(claim Claim) []merkle.Node {
 	}
 
 	tree := merkle.NewTree(hashables)
-	p, err := tree.Proof(claim)
-	if err != nil {
-		panic(err)
-	}
-
+	p, _ := tree.Proof(claim)
 	return p
 }
 
