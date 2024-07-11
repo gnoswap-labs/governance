@@ -14,8 +14,8 @@ type IDelegatedToken interface {
 	Delegate(owner, to std.Address)
 	Deposit()
 	DepositAmount(amount *u256.Uint)
-	// Withdraw()
-	// WithdrawAmount(amount *u256.Uint)
+	Withdraw()
+	WithdrawAmount(amount *u256.Uint)
 }
 
 type DelegatedToken struct {
@@ -78,7 +78,7 @@ func Delegate(owner, to std.Address) {
 	if currDelegatee != to {
 		gDelegatedToken.delegatedTo[owner] = to
 
-		// TODO: move delegates
+		// TODO: move delegates ?
 
 		std.Emit(
 			"Delegation",
@@ -118,6 +118,100 @@ func Deposit() {
         "from", caller.String(),
         "amount", amount.ToString(),
     )
+}
+
+// DepositAmount deposites a specific amount of tokens
+func DepositAmount(amount *u256.Uint) {
+	if gDelegatedToken == nil {
+		panic("DelegatedToken not initialized")
+	}
+
+	caller := std.GetOrigCaller()
+	token := gDelegatedToken.token
+
+	// check allowance
+	allowance := token.Allowance(caller, std.GetOrigPkgAddr())
+	if u256.NewUint(allowance).Cmp(amount) < 0 {
+		panic("insufficient allowance")
+	}
+
+	// transfer tokens from caller to this contract
+	err := token.TransferFrom(caller, std.GetOrigPkgAddr(), amount.Uint64())
+	if err != nil {
+		panic("transfer failed: " + err.Error())
+	}
+
+	// mint equivalent amount of delegated tokens
+	mintDelegatedTokens(caller, amount)
+
+	std.Emit(
+		"DepositAmount",
+		"from", caller.String(),
+		"amount", amount.ToString(),
+	)
+}
+
+// Withdraw withdraws the entire staked balance from the contract for the caller
+func Withdraw() {
+	if gDelegatedToken == nil {
+		panic("DelegatedToken not initialized")
+	}
+
+	caller := std.GetOrigCaller()
+	balance := BalanceOf(caller)
+
+	if balance.IsZero() {
+		panic("no balance to withdraw")
+	}
+
+	// burn the delegated tokens
+	gDelegatedToken.balances[caller] = u256.Zero()
+	gDelegatedToken.totalSupply = u256.Zero().Sub(gDelegatedToken.totalSupply, balance)
+
+	// transfer the original tokens back to the caller
+	token := gDelegatedToken.token
+	err := token.Transfer(caller, balance.Uint64())
+	if err != nil {
+		panic("transfer failed: " + err.Error())
+	}
+
+	std.Emit(
+		"Withdrawal",
+		"from", caller.String(),
+		"amount", balance.ToString(),
+	)
+}
+
+// WithdrawAmount withdraws specified amount of token
+// from the contract for the caller
+func WithdrawAmount(amount *u256.Uint) {
+	if gDelegatedToken == nil {
+		panic("DelegatedToken not initialized")
+	}
+
+	caller := std.GetOrigCaller()
+	balance := BalanceOf(caller)
+
+	if balance.Cmp(amount) < 0 {
+		panic("insufficient balance to withdraw")
+	}
+
+	// Burn the delegated tokens
+	gDelegatedToken.balances[caller] = u256.Zero().Sub(balance, amount)
+	gDelegatedToken.totalSupply = u256.Zero().Sub(gDelegatedToken.totalSupply, amount)
+
+	// transfer the original token back to the caller
+	token := gDelegatedToken.token
+	err := token.Transfer(caller, amount.Uint64())
+	if err != nil {
+		panic("transfer failed: " + err.Error())
+	}
+
+	std.Emit(
+		"WithdrawAmount",
+		"from", caller.String(),
+		"amount", amount.ToString(),
+	)
 }
 
 func mintDelegatedTokens(to std.Address, amount *u256.Uint) {

@@ -201,3 +201,174 @@ func TestDeposit(t *testing.T) {
 		t.Errorf("Deposit() failed, totalSupply = %v, want %v", gDelegatedToken.totalSupply, allowance)
 	}
 }
+
+func TestDepositAmount(t *testing.T) {
+	mockStaker := testutils.TestAddress("mockStaker")
+	mockToken := newMockGRC20("Test Token", "TST", 18)
+	Init(mockStaker, mockToken, "Test Token", "TST")
+
+	owner := testutils.TestAddress("owner")
+	std.TestSetOrigCaller(owner)
+
+	// Set initial balance and allowance
+	initialBalance := uint64(1000)
+	allowance := uint64(500)
+	depositAmount := u256.NewUint(300)
+	mockToken.balances[owner] = initialBalance
+	mockToken.Approve(std.GetOrigPkgAddr(), allowance)
+
+	// Call DepositAmount
+	DepositAmount(depositAmount)
+
+	// Check balance of delegated tokens
+	balance := BalanceOf(owner)
+	if balance.Cmp(depositAmount) != 0 {
+		t.Errorf("DepositAmount() failed, BalanceOf() = %v, want %v", balance, depositAmount)
+	}
+
+	// Check balance of original tokens
+	originalBalance := mockToken.BalanceOf(owner)
+	expectedBalance := initialBalance - depositAmount.Uint64()
+	if originalBalance != expectedBalance {
+		t.Errorf("DepositAmount() failed, original token balance = %v, want %v", originalBalance, expectedBalance)
+	}
+
+	// Check total supply
+	if gDelegatedToken.totalSupply.Cmp(depositAmount) != 0 {
+		t.Errorf("DepositAmount() failed, totalSupply = %v, want %v", gDelegatedToken.totalSupply, depositAmount)
+	}
+
+	// Test depositing more than allowance (should panic)
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("DepositAmount() did not panic when amount > allowance")
+		}
+	}()
+	DepositAmount(u256.NewUint(allowance + 1))
+}
+
+func TestDepositZeroAmount(t *testing.T) {
+	mockStaker := testutils.TestAddress("mockStaker")
+	mockToken := newMockGRC20("Test Token", "TST", 18)
+	Init(mockStaker, mockToken, "Test Token", "TST")
+
+	owner := testutils.TestAddress("owner")
+	std.TestSetOrigCaller(owner)
+
+	// Set initial balance and allowance
+	mockToken.balances[owner] = 1000
+	mockToken.Approve(std.GetOrigPkgAddr(), 500)
+
+	// Attempt to deposit zero amount
+	zeroAmount := u256.NewUint(0)
+	DepositAmount(zeroAmount)
+
+	// Check balance of delegated tokens (should be zero)
+	balance := BalanceOf(owner)
+	if !balance.IsZero() {
+		t.Errorf("DepositAmount(0) failed, BalanceOf() = %v, want 0", balance)
+	}
+
+	// Check total supply (should be zero)
+	if !gDelegatedToken.totalSupply.IsZero() {
+		t.Errorf("DepositAmount(0) failed, totalSupply = %v, want 0", gDelegatedToken.totalSupply)
+	}
+}
+
+func TestWithdraw(t *testing.T) {
+	mockStaker := testutils.TestAddress("mockStaker")
+	mockToken := newMockGRC20("Test Token", "TST", 18)
+	Init(mockStaker, mockToken, "Test Token", "TST")
+
+	owner := testutils.TestAddress("owner")
+	std.TestSetOrigCaller(owner)
+
+	// Set initial balance and deposit
+	initialBalance := uint64(1000)
+	depositAmount := u256.NewUint(500)
+	mockToken.balances[owner] = initialBalance
+	mockToken.Approve(std.GetOrigPkgAddr(), depositAmount.Uint64())
+	DepositAmount(depositAmount)
+
+	// Check initial delegated token balance
+	delegatedBalance := BalanceOf(owner)
+	if delegatedBalance.Cmp(depositAmount) != 0 {
+		t.Errorf("Initial BalanceOf() = %v, want %v", delegatedBalance, depositAmount)
+	}
+
+	// Withdraw
+	Withdraw()
+
+	// Check delegated token balance after withdrawal (should be zero)
+	delegatedBalance = BalanceOf(owner)
+	if !delegatedBalance.IsZero() {
+		t.Errorf("After Withdraw(), BalanceOf() = %v, want 0", delegatedBalance)
+	}
+
+	// Check original token balance after withdrawal
+	originalBalance := mockToken.BalanceOf(owner)
+	expectedBalance := initialBalance - depositAmount.Uint64() // 1000 - 500 = 500
+	if originalBalance != expectedBalance {
+		t.Errorf("After Withdraw(), original token balance = %v, want %v", originalBalance, expectedBalance)
+	}
+
+	// Check total supply (should be zero)
+	if !gDelegatedToken.totalSupply.IsZero() {
+		t.Errorf("After Withdraw(), totalSupply = %v, want 0", gDelegatedToken.totalSupply)
+	}
+
+	// Test withdrawing with zero balance (should panic)
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Withdraw() did not panic when balance is zero")
+		}
+	}()
+	Withdraw()
+}
+
+func TestWithdrawAmount(t *testing.T) {
+	mockStaker := testutils.TestAddress("mockStaker")
+	mockToken := newMockGRC20("Test Token", "TST", 18)
+	Init(mockStaker, mockToken, "Test Token", "TST")
+
+	owner := testutils.TestAddress("owner")
+	std.TestSetOrigCaller(owner)
+
+	// Set initial balance and deposit
+	initialBalance := uint64(1000)
+	depositAmount := u256.NewUint(500)
+	mockToken.balances[owner] = initialBalance
+	mockToken.Approve(std.GetOrigPkgAddr(), depositAmount.Uint64())
+	DepositAmount(depositAmount)
+
+	// Withdraw half of the deposited amount
+	withdrawAmount := u256.NewUint(250)
+	WithdrawAmount(withdrawAmount)
+
+	// Check delegated token balance after withdrawal
+	delegatedBalance := BalanceOf(owner)
+	expectedDelegatedBalance := u256.NewUint(250)
+	if delegatedBalance.Cmp(expectedDelegatedBalance) != 0 {
+		t.Errorf("After WithdrawAmount(), BalanceOf() = %v, want %v", delegatedBalance, expectedDelegatedBalance)
+	}
+
+	// Check original token balance after withdrawal
+	originalBalance := mockToken.BalanceOf(owner)
+	expectedOriginalBalance := initialBalance - depositAmount.Uint64()
+	if originalBalance != expectedOriginalBalance {
+		t.Errorf("After WithdrawAmount(), original token balance = %v, want %v", originalBalance, expectedOriginalBalance)
+	}
+
+	// Check total supply
+	if gDelegatedToken.totalSupply.Cmp(expectedDelegatedBalance) != 0 {
+		t.Errorf("After WithdrawAmount(), totalSupply = %v, want %v", gDelegatedToken.totalSupply, expectedDelegatedBalance)
+	}
+
+	// Test withdrawing more than balance (should panic)
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("WithdrawAmount() did not panic when amount > balance")
+		}
+	}()
+	WithdrawAmount(u256.NewUint(1000))
+}
