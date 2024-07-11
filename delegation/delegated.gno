@@ -8,6 +8,7 @@ import (
 	u256 "gno.land/p/demo/uint256"
 )
 
+// IDelegatedToken defines the interface for a delegated token.
 type IDelegatedToken interface {
 	GetStaker() std.Address
 	GetDelegatedTo(owner std.Address) std.Address
@@ -18,14 +19,30 @@ type IDelegatedToken interface {
 	WithdrawAmount(amount *u256.Uint)
 }
 
+// DelegatedToken represents a token that can be delegated to another address.
 type DelegatedToken struct {
+	// staker is the address of the entity staking the tokens.
 	staker      std.Address
+
+	// token is the unerlying GRC20 token being staked.
 	token       grc20.Token
+
+	// delegatedTo maps owner address to their delegate address.
 	delegatedTo map[std.Address]std.Address
+
+	// balances keeps track of the delegated token balances for each account.
 	balances    map[std.Address]*u256.Uint
+
+	// allowances tracks the spending allowances for delegated tokens.
 	allowances  map[std.Address]map[std.Address]*u256.Uint
+
+	// totoalSupply represents the total amount of delegated tokens in circulation.
 	totalSupply *u256.Uint
+
+	// name is the name of the delegated token.
 	name        string
+
+	// symbol is the symbol of the delegated token.
 	symbol      string
 }
 
@@ -214,6 +231,7 @@ func WithdrawAmount(amount *u256.Uint) {
 	)
 }
 
+// mintDelegatedTokens mints the specified amount of delegated tokens for the given account (address).
 func mintDelegatedTokens(to std.Address, amount *u256.Uint) {
 	if gDelegatedToken.balances[to] == nil {
 		gDelegatedToken.balances[to] = u256.Zero()
@@ -222,6 +240,7 @@ func mintDelegatedTokens(to std.Address, amount *u256.Uint) {
 	gDelegatedToken.totalSupply.Add(gDelegatedToken.totalSupply, amount)
 }
 
+// BalanceOf returns the balance of delegated tokens for the given account.
 func BalanceOf(account std.Address) *u256.Uint {
 	if gDelegatedToken == nil {
 		panic("DelegatedToken not initialized")
