@@ -34,13 +34,13 @@ var gDelegatedToken *DelegatedToken
 // Init initializes the DelegatedToken contract
 func Init(staker std.Address, token grc20.Token, name string, symbol string) {
 	gDelegatedToken = &DelegatedToken{
-		staker: 	staker,
-		token:      token,
+		staker:      staker,
+		token:       token,
 		delegatedTo: make(map[std.Address]std.Address),
-		balances:   make(map[std.Address]*u256.Uint),
+		balances:    make(map[std.Address]*u256.Uint),
 		totalSupply: u256.Zero(),
-		name: 	 name,
-		symbol: symbol,
+		name:        name,
+		symbol:      symbol,
 	}
 }
 
@@ -91,33 +91,33 @@ func Delegate(owner, to std.Address) {
 // Deposit transfers the approved amount of the staked token to this contract
 // and mints an GRC20 representing the staked amount.
 func Deposit() {
-    if gDelegatedToken == nil {
-        panic("DelegatedToken not initialized")
-    }
+	if gDelegatedToken == nil {
+		panic("DelegatedToken not initialized")
+	}
 
-    caller := std.GetOrigCaller()
-    token := gDelegatedToken.token
+	caller := std.GetOrigCaller()
+	token := gDelegatedToken.token
 
-    // get the approved amount
-    allowance := token.Allowance(caller, std.GetOrigPkgAddr())
-    if allowance == 0 {
-        panic("no allowance")
-    }
+	// get the approved amount
+	allowance := token.Allowance(caller, std.GetOrigPkgAddr())
+	if allowance == 0 {
+		panic("no allowance")
+	}
 
-    err := token.TransferFrom(caller, std.GetOrigPkgAddr(), allowance)
-    if err != nil {
-        panic("transfer failed: " + err.Error())
-    }
+	err := token.TransferFrom(caller, std.GetOrigPkgAddr(), allowance)
+	if err != nil {
+		panic("transfer failed: " + err.Error())
+	}
 
-    // mint equivalent amount of delegated tokens
-    amount := u256.NewUint(allowance)
-    mintDelegatedTokens(caller, amount)
+	// mint equivalent amount of delegated tokens
+	amount := u256.NewUint(allowance)
+	mintDelegatedTokens(caller, amount)
 
-    std.Emit(
-        "Deposit",
-        "from", caller.String(),
-        "amount", amount.ToString(),
-    )
+	std.Emit(
+		"Deposit",
+		"from", caller.String(),
+		"amount", amount.ToString(),
+	)
 }
 
 // DepositAmount deposites a specific amount of tokens
