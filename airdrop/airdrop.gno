@@ -125,11 +125,12 @@ func (a *Airdrop) Claim(claim Claim, proof []merkle.Node) bool {
 	}
 
 	// check if the airdrop contract has enough balance to transfer
-	airdropBalance := a.token.BalanceOf(a.address)
-	if airdropBalance < claim.Amount.Uint64() {
+	airdropBalance := uint256.NewUint(a.token.BalanceOf(a.address))
+	if claim.Amount.Gt(airdropBalance) {
 		panic(ErrInsufficientBalance)
 	}
 
+	// FIXME. Uint64 method may be problematic
 	err := a.token.Transfer(claim.Claimee, claim.Amount.Uint64())
 	if err != nil {
 		panic(err)
@@ -147,8 +148,7 @@ func (a *Airdrop) Claim(claim Claim, proof []merkle.Node) bool {
 	return true
 }
 
-// Claim64 processes up to 64 claims in a single batch
-func (a *Airdrop) Claim64(claims []Claim) (uint8, error) {
+func (a *Airdrop) Claim64(claims []Claim, proofs [][]merkle.Node) uint8 {
 	if len(claims) == 0 || len(claims) > 64 {
 		panic(ErrInvalidClaimsCount)
 	}
@@ -157,28 +157,32 @@ func (a *Airdrop) Claim64(claims []Claim) (uint8, error) {
 		panic(ErrFirstClaimIsNot64)
 	}
 
+	if len(claims) != len(proofs) {
+		panic("INVALID_PROOFS_COUNT")
+	}
+
 	word := claims[0].ID / 64
 	bitmap := a.claimedBitmap[word]
 
-	var (
-		claimedCount uint8
-		totalAmount  uint64
-	)
+	var claimedCount uint8
+	var totalAmount  uint256.Uint
 
-	// calculate total amount and check if any claim is already processed
+	// verify all claims and calculate total amount
 	for i, claim := range claims {
+		if !a.VerifySnapshot(claim, proofs[i], len(a.snapshots)-1) {
+			panic("INVALID_PROOF")
+		}
+
 		index := uint64(i)
 		mask := uint64(1) << index
-		alreadyClaimed := bitmap&mask != 0
-
-		if !alreadyClaimed {
-			totalAmount += claim.Amount.Uint64()
+		if bitmap&mask == 0 {
+			totalAmount.Add(&totalAmount, claim.Amount)
 		}
 	}
 
-	// check has enough balance to transfer
-	airdropBalance := a.token.BalanceOf(std.GetOrigCaller())
-	if airdropBalance < totalAmount {
+	// check if the contract has enough balance to transfer
+	airdropBalance := a.token.BalanceOf(a.address)
+	if uint256.NewUint(airdropBalance).Cmp(&totalAmount) < 0 {
 		panic(ErrInsufficientBalance)
 	}
 
@@ -187,22 +191,22 @@ func (a *Airdrop) Claim64(claims []Claim) (uint8, error) {
 		index := uint64(i)
 		mask := uint64(1) << index
 
-		alreadyClaimed := bitmap&mask != 0
-		if alreadyClaimed {
-			continue
-		}
+		if bitmap&mask == 0 {
+			a.token.Transfer(claim.Claimee, claim.Amount.Uint64())
+			bitmap |= mask
+			claimedCount++
 
-		err := a.token.Transfer(claim.Claimee, claim.Amount.Uint64())
-		if err != nil {
-			return claimedCount, err
+			std.Emit(
+				"Claimed",
+				"id", string(claim.ID),
+				"claimee", claim.Claimee.String(),
+				"amount", claim.Amount.ToString(),
+			)
 		}
-
-		bitmap |= mask
-		claimedCount++
 	}
 
 	a.claimedBitmap[word] = bitmap
-	return claimedCount, nil
+	return claimedCount
 }
 
 // Refund refunds the remaining tokens to the specified address after the refundable timestamp

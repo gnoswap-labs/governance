@@ -56,11 +56,9 @@ func (m *mockGRC20) BalanceOf(account std.Address) uint64 {
 
 func (m *mockGRC20) Transfer(to std.Address, amount uint64) error {
 	from := std.GetOrigCaller()
-	// xxx
-	// panic(amount)
-	// if m.balances[from] < amount {
-	// 	return errors.New("insufficient balance")
-	// }
+	if m.balances[from] < amount {
+		panic(ErrInsufficientBalance)
+	}
 	m.balances[from] -= amount
 	m.balances[to] += amount
 	return nil
@@ -219,13 +217,6 @@ func TestClaim64(t *testing.T) {
 	address := std.Address("test")
 	mockToken := NewMockGRC20("Test Token", "TST", 18)
 
-	// Create a new Airdrop instance
-	airdrop := NewAirdrop(mockToken, Config{}, address, nil)
-
-	// Set up some initial balances
-	airdropAddress := std.GetOrigCaller()
-	mockToken.balances[airdropAddress] = 1000000 // Initial balance of airdrop contract
-
 	// Create 64 claims
 	claims := make([]Claim, 64)
 	for i := 0; i < 64; i++ {
@@ -236,8 +227,21 @@ func TestClaim64(t *testing.T) {
 		}
 	}
 
+	// Create a new Airdrop instance with initial claims
+	airdrop := NewAirdrop(mockToken, Config{}, address, claims)
+
+	// Set up some initial balances
+	airdropAddress := airdrop.GetAddress()
+	mockToken.balances[airdropAddress] = 1000000 // Initial balance of airdrop contract
+
+	// Generate proofs for all claims
+	proofs := make([][]merkle.Node, 64)
+	for i, claim := range claims {
+		proofs[i] = airdrop.GetProof(claim)
+	}
+
 	// Test successful batch claim
-	claimed, _ := airdrop.Claim64(claims)
+	claimed := airdrop.Claim64(claims, proofs)
 	if claimed != 64 {
 		t.Errorf("Expected 64 claims, got %d", claimed)
 	}
@@ -255,19 +259,21 @@ func TestClaim64(t *testing.T) {
 	}
 
 	// Test claiming again (should claim 0)
-	claimed, _ = airdrop.Claim64(claims)
+	claimed = airdrop.Claim64(claims, proofs)
 	if claimed != 0 {
 		t.Errorf("Expected 0 claims, got %d", claimed)
 	}
 
 	// Test with insufficient balance
 	bigClaims := make([]Claim, 64)
+	bigProofs := make([][]merkle.Node, 64)
 	for i := 0; i < 64; i++ {
 		bigClaims[i] = Claim{
 			ID:      uint64((i + 1) * 64),
 			Claimee: std.Address(ufmt.Sprintf("claimee%d", i)),
 			Amount:  uint256.NewUint(20000), // Each claim is for 20000 tokens, which is more than the remaining balance
 		}
+		bigProofs[i] = airdrop.GetProof(bigClaims[i])
 	}
 
 	defer func() {
@@ -278,10 +284,11 @@ func TestClaim64(t *testing.T) {
 		}
 	}()
 
-	airdrop.Claim64(bigClaims)
+	airdrop.Claim64(bigClaims, bigProofs)
 
 	// Test with invalid claim count
 	invalidClaims := make([]Claim, 65) // 65 claims, which is more than allowed
+	invalidProofs := make([][]merkle.Node, 65)
 
 	defer func() {
 		if r := recover(); r == nil {
@@ -291,11 +298,12 @@ func TestClaim64(t *testing.T) {
 		}
 	}()
 
-	airdrop.Claim64(invalidClaims)
+	airdrop.Claim64(invalidClaims, invalidProofs)
 
 	// Test with invalid first claim ID
 	invalidFirstClaim := make([]Claim, 64)
 	invalidFirstClaim[0] = Claim{ID: 1} // First claim ID is not a multiple of 64
+	invalidFirstProofs := make([][]merkle.Node, 64)
 
 	defer func() {
 		if r := recover(); r == nil {
@@ -305,8 +313,101 @@ func TestClaim64(t *testing.T) {
 		}
 	}()
 
-	airdrop.Claim64(invalidFirstClaim)
+	airdrop.Claim64(invalidFirstClaim, invalidFirstProofs)
 }
+
+// func TestClaim64(t *testing.T) {
+// 	address := std.Address("test")
+// 	mockToken := NewMockGRC20("Test Token", "TST", 18)
+
+// 	// Create a new Airdrop instance
+// 	airdrop := NewAirdrop(mockToken, Config{}, address, nil)
+
+// 	// Set up some initial balances
+// 	airdropAddress := std.GetOrigCaller()
+// 	mockToken.balances[airdropAddress] = 1000000 // Initial balance of airdrop contract
+
+// 	// Create 64 claims
+// 	claims := make([]Claim, 64)
+// 	for i := 0; i < 64; i++ {
+// 		claims[i] = Claim{
+// 			ID:      uint64(i * 64), // Ensure first claim ID is multiple of 64
+// 			Claimee: std.Address(ufmt.Sprintf("claimee%d", i)),
+// 			Amount:  uint256.NewUint(1000), // Each claim is for 1000 tokens
+// 		}
+// 	}
+
+// 	// Test successful batch claim
+// 	claimed, _ := airdrop.Claim64(claims)
+// 	if claimed != 64 {
+// 		t.Errorf("Expected 64 claims, got %d", claimed)
+// 	}
+
+// 	// Check balances after claims
+// 	airdropBalance := mockToken.BalanceOf(airdropAddress)
+// 	if airdropBalance != 936000 { // 1000000 - (64 * 1000)
+// 		t.Errorf("Expected airdrop balance to be 936000, got %d", airdropBalance)
+// 	}
+// 	for i := 0; i < 64; i++ {
+// 		claimeeBalance := mockToken.BalanceOf(std.Address(ufmt.Sprintf("claimee%d", i)))
+// 		if claimeeBalance != 1000 {
+// 			t.Errorf("Expected claimee%d balance to be 1000, got %d", i, claimeeBalance)
+// 		}
+// 	}
+
+// 	// Test claiming again (should claim 0)
+// 	claimed, _ = airdrop.Claim64(claims)
+// 	if claimed != 0 {
+// 		t.Errorf("Expected 0 claims, got %d", claimed)
+// 	}
+
+// 	// Test with insufficient balance
+// 	bigClaims := make([]Claim, 64)
+// 	for i := 0; i < 64; i++ {
+// 		bigClaims[i] = Claim{
+// 			ID:      uint64((i + 1) * 64),
+// 			Claimee: std.Address(ufmt.Sprintf("claimee%d", i)),
+// 			Amount:  uint256.NewUint(20000), // Each claim is for 20000 tokens, which is more than the remaining balance
+// 		}
+// 	}
+
+// 	defer func() {
+// 		if r := recover(); r == nil {
+// 			t.Errorf("The code did not panic")
+// 		} else if r != ErrInsufficientBalance {
+// 			t.Errorf("Expected ErrInsufficientBalance panic, got %v", r)
+// 		}
+// 	}()
+
+// 	airdrop.Claim64(bigClaims)
+
+// 	// Test with invalid claim count
+// 	invalidClaims := make([]Claim, 65) // 65 claims, which is more than allowed
+
+// 	defer func() {
+// 		if r := recover(); r == nil {
+// 			t.Errorf("The code did not panic")
+// 		} else if r != ErrInvalidClaimsCount {
+// 			t.Errorf("Expected ErrInvalidClaimsCount panic, got %v", r)
+// 		}
+// 	}()
+
+// 	airdrop.Claim64(invalidClaims)
+
+// 	// Test with invalid first claim ID
+// 	invalidFirstClaim := make([]Claim, 64)
+// 	invalidFirstClaim[0] = Claim{ID: 1} // First claim ID is not a multiple of 64
+
+// 	defer func() {
+// 		if r := recover(); r == nil {
+// 			t.Errorf("The code did not panic")
+// 		} else if r != ErrFirstClaimIsNot64 {
+// 			t.Errorf("Expected ErrFirstClaimIsNot64 panic, got %v", r)
+// 		}
+// 	}()
+
+// 	airdrop.Claim64(invalidFirstClaim)
+// }
 
 func TestRefund(t *testing.T) {
 	token := NewMockGRC20("Test Token", "TST", 18)
