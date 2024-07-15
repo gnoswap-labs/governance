@@ -241,3 +241,57 @@ func TestStakingQueries(t *testing.T) {
         }
     })
 }
+
+func TestClaimRewards(t *testing.T) {
+	Init()
+
+	user1 := std.Address("user1")
+	user2 := std.Address("user2")
+
+	StakeForUser(user1, u256.NewUint(1000))
+	StakeForUser(user2, u256.NewUint(500))
+
+	SimulateRewardAccrual(u256.NewUint(100)) // 100 tokens distributed as rewards
+
+	t.Run("claim rewards", func(t *testing.T) {
+		// user 1 claims rewards
+		reward1, err := ClaimRewards(user1)
+		if err != nil {
+			t.Fatalf("failed to claim rewards for user1: %v", err)
+		}
+		expectedReward1 := u256.NewUint(66) // (1000 / 1500) * 100
+		if reward1.Cmp(expectedReward1) != 0 {
+			t.Errorf("Expected reward of %v for user1, got %v", expectedReward1, reward1)
+		}
+
+		reward2, err := ClaimRewards(user2)
+		if err != nil {
+			t.Fatalf("failed to claim rewards for user2: %v", err)
+		}
+		expectedReward2 := u256.NewUint(33) // (500 / 1500) * 100
+		if reward2.Cmp(expectedReward2) != 0 {
+			t.Errorf("Expected reward of %v for user2, got %v", expectedReward2, reward2)
+		}
+
+		reward1Again, err := ClaimRewards(user1)
+		if err != nil {
+			t.Fatalf("failed to claim rewards for user1 again: %v", err)
+		}
+		if !reward1Again.IsZero() {
+			t.Errorf("Expected zero reward for user1, got %v", reward1Again)
+		}
+	})
+
+	t.Run("claim with no stake", func(t *testing.T) {
+		noStakedUser := std.Address("noStake")
+		_, err := ClaimRewards(noStakedUser)
+		if err == nil {
+			t.Fatalf("Expected an error, but got none")
+		}
+	})
+}
+
+func SimulateRewardAccrual(amount *u256.Uint) {
+    // This function simulates the distribution of rewards
+    gTotalRewards = gTotalRewards.Add(gTotalRewards, amount)
+}

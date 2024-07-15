@@ -26,6 +26,8 @@ var (
 	gTotalStaked     *u256.Uint
 	gStakedPositions []*StakedPosition
 	gStakers 	   map[std.Address]bool
+	gTotalRewards	*u256.Uint
+	gClaimedRewards	map[std.Address]*u256.Uint
 )
 
 // StakedPosition represents a single staked position.
@@ -40,6 +42,8 @@ func Init() {
 	gTotalStaked = u256.Zero()
 	gStakedPositions = make([]*StakedPosition, 0)
 	gStakers = make(map[std.Address]bool)
+	gTotalRewards = u256.Zero()
+	gClaimedRewards = make(map[std.Address]*u256.Uint)
 }
 
 // calculateRewardMultiplier calculates the reward multiplier based on the staking duration.
@@ -124,4 +128,51 @@ func GetTotalStakedAmount() *u256.Uint {
 
 func GetTotalStakers() int {
 	return len(gStakers)
+}
+
+func ClaimRewards(user std.Address) (*u256.Uint, error) {
+	userStakes := GetUserStakes(user)
+	if len(userStakes) == 0 {
+		return nil, errors.New("no stakes found for user")
+	}
+
+	totalStaked := GetTotalStakedAmount()
+	if totalStaked.IsZero() {
+		return nil, errors.New("total staked amount is zero")
+	}
+
+	userTotalStake := u256.Zero()
+	for _, stake := range userStakes {
+		userTotalStake = u256.Zero().Add(userTotalStake, stake.Amount)
+	}
+
+	// calculate user's share of the total rewards.
+	userShare := u256.Zero().Div(u256.Zero().Mul(userTotalStake, gTotalRewards), totalStaked)
+
+	// subtract previously claimed rewards
+	previouslyClaimed, exists := gClaimedRewards[user]
+	if !exists {
+		previouslyClaimed = u256.Zero()
+	}
+	reward := u256.Zero().Sub(userShare, previouslyClaimed)
+
+	// update claimed rewards
+	gClaimedRewards[user] = userShare
+
+	// TODO: Transfer the reward to the user
+
+	return reward, nil
+}
+
+// GetTotalRewards returns the total rewards distributed so far.
+func GetTotalRewards() *u256.Uint {
+	return gTotalRewards.Clone()
+}
+
+func GetClaimedRewards(user std.Address) *u256.Uint {
+	claimed, exists := gClaimedRewards[user]
+	if !exists {
+		return u256.Zero()
+	}
+	return claimed.Clone()
 }
