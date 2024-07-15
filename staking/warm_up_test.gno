@@ -165,81 +165,81 @@ func TestStake(t *testing.T) {
 }
 
 func TestStakeMultiple(t *testing.T) {
-    Init()
+	Init()
 
-    amounts := []*u256.Uint{
-        u256.NewUint(100),
-        u256.NewUint(200),
-        u256.NewUint(300),
-    }
+	amounts := []*u256.Uint{
+		u256.NewUint(100),
+		u256.NewUint(200),
+		u256.NewUint(300),
+	}
 
-    for i, amount := range amounts {
-        err := Stake(amount)
-        if err != nil {
-            t.Fatalf("Failed to stake amount %v: %v", amount, err)
-        }
+	for i, amount := range amounts {
+		err := Stake(amount)
+		if err != nil {
+			t.Fatalf("Failed to stake amount %v: %v", amount, err)
+		}
 
-        position := GetLastStakedPosition()
-        if position == nil {
-            t.Fatal("Expected a staked position, but got nil")
-        }
-        if position.Amount.Cmp(amount) != 0 {
-            t.Errorf("Staked amount incorrect for position %d. Got: %v, Want: %v", i, position.Amount, amount)
-        }
-    }
+		position := GetLastStakedPosition()
+		if position == nil {
+			t.Fatal("Expected a staked position, but got nil")
+		}
+		if position.Amount.Cmp(amount) != 0 {
+			t.Errorf("Staked amount incorrect for position %d. Got: %v, Want: %v", i, position.Amount, amount)
+		}
+	}
 
-    totalStaked := GetTotalStaked()
-    expectedTotal := u256.NewUint(600)
-    if totalStaked.Cmp(expectedTotal) != 0 {
-        t.Errorf("Total staked amount incorrect. Got: %v, Want: %v", totalStaked, expectedTotal)
-    }
+	totalStaked := GetTotalStaked()
+	expectedTotal := u256.NewUint(600)
+	if totalStaked.Cmp(expectedTotal) != 0 {
+		t.Errorf("Total staked amount incorrect. Got: %v, Want: %v", totalStaked, expectedTotal)
+	}
 }
 
 func TestStakingQueries(t *testing.T) {
-    Init()
+	Init()
 
-    user1 := std.Address("user1")
-    user2 := std.Address("user2")
+	user1 := std.Address("user1")
+	user2 := std.Address("user2")
 
-    StakeForUser(user1, u256.NewUint(100))
-    StakeForUser(user1, u256.NewUint(200))
-    StakeForUser(user2, u256.NewUint(300))
+	StakeForUser(user1, u256.NewUint(100))
+	StakeForUser(user1, u256.NewUint(200))
+	StakeForUser(user2, u256.NewUint(300))
 
-    t.Run("GetUserStakes", func(t *testing.T) {
-        stakes := GetUserStakes(user1)
-        if len(stakes) != 2 {
-            t.Errorf("Expected 2 stakes for user1, got %d", len(stakes))
-        }
-        totalStaked := u256.Zero()
-        for _, stake := range stakes {
-            totalStaked = totalStaked.Add(totalStaked, stake.Amount)
-        }
-        if totalStaked.Cmp(u256.NewUint(300)) != 0 {
-            t.Errorf("Expected total stake of 300 for user1, got %s", totalStaked.ToString())
-        }
+	t.Run("GetUserStakes", func(t *testing.T) {
+		stakes := GetUserStakes(user1)
+		if len(stakes) != 2 {
+			t.Errorf("Expected 2 stakes for user1, got %d", len(stakes))
+		}
+		totalStaked := u256.Zero()
+		for _, stake := range stakes {
+			totalStaked = totalStaked.Add(totalStaked, stake.Amount)
+		}
+		if totalStaked.Cmp(u256.NewUint(300)) != 0 {
+			t.Errorf("Expected total stake of 300 for user1, got %s", totalStaked.ToString())
+		}
 
-        stakes = GetUserStakes(user2)
-        if len(stakes) != 1 {
-            t.Errorf("Expected 1 stake for user2, got %d", len(stakes))
-        }
-        if stakes[0].Amount.Cmp(u256.NewUint(300)) != 0 {
-            t.Errorf("Expected stake of 300 for user2, got %s", stakes[0].Amount.ToString())
-        }
-    })
+		stakes = GetUserStakes(user2)
+		if len(stakes) != 1 {
+			t.Errorf("Expected 1 stake for user2, got %d", len(stakes))
+		}
+		if stakes[0].Amount.Cmp(u256.NewUint(300)) != 0 {
+			t.Errorf("Expected stake of 300 for user2, got %s", stakes[0].Amount.ToString())
+		}
+	})
 
-    t.Run("GetTotalStakedAmount", func(t *testing.T) {
-        totalStaked := GetTotalStakedAmount()
-        if totalStaked.Cmp(u256.NewUint(600)) != 0 {
-            t.Errorf("Expected total staked amount of 600, got %s", totalStaked.ToString())
-        }
-    })
+	t.Run("GetTotalStakedAmount", func(t *testing.T) {
+		totalStaked := GetTotalStakedAmount()
+		if totalStaked.Cmp(u256.NewUint(600)) != 0 {
+			t.Errorf("Expected total staked amount of 600, got %s", totalStaked.ToString())
+		}
+	})
 
-    t.Run("GetTotalStakers", func(t *testing.T) {
-        totalStakers := GetTotalStakers()
-        if totalStakers != 2 {
-            t.Errorf("Expected 2 total stakers, got %d", totalStakers)
-        }
-    })
+	t.Run("GetTotalStakers", func(t *testing.T) {
+		totalStakers := GetTotalStakers()
+		if totalStakers != 2 {
+			t.Errorf("Expected 2 total stakers, got %d", totalStakers)
+		}
+	})
 }
 
 func TestClaimRewards(t *testing.T) {
@@ -292,8 +292,8 @@ func TestClaimRewards(t *testing.T) {
 }
 
 func SimulateRewardAccrual(amount *u256.Uint) {
-    // This function simulates the distribution of rewards
-    gTotalRewards = gTotalRewards.Add(gTotalRewards, amount)
+	// This function simulates the distribution of rewards
+	gTotalRewards = gTotalRewards.Add(gTotalRewards, amount)
 }
 
 func TestStakingPeriod(t *testing.T) {
@@ -303,8 +303,8 @@ func TestStakingPeriod(t *testing.T) {
 	amount := u256.NewUint(1000)
 
 	var (
-		_30Days  = 30 * 24 * time.Hour
-		_90Days  = 90 * 24 * time.Hour
+		_30Days = 30 * 24 * time.Hour
+		_90Days = 90 * 24 * time.Hour
 	)
 
 	t.Run("stake with different periods", func(t *testing.T) {
