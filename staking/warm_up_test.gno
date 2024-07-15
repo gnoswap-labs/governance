@@ -295,3 +295,42 @@ func SimulateRewardAccrual(amount *u256.Uint) {
     // This function simulates the distribution of rewards
     gTotalRewards = gTotalRewards.Add(gTotalRewards, amount)
 }
+
+func TestStakingPeriod(t *testing.T) {
+	Init()
+
+	user1 := std.Address("user1")
+	amount := u256.NewUint(1000)
+
+	var (
+		_30Days  = 30 * 24 * time.Hour
+		_90Days  = 90 * 24 * time.Hour
+	)
+
+	t.Run("stake with different periods", func(t *testing.T) {
+		// stake for 30 days
+		err := StakeWithPeriod(user1, amount, _30Days)
+		if err != nil {
+			t.Fatalf("failed to stake for 30 days: %v", err)
+		}
+
+		// stake for 90 days
+		err = StakeWithPeriod(user1, amount, _90Days)
+		if err != nil {
+			t.Fatalf("failed to stake for 90 days: %v", err)
+		}
+
+		stakes := GetUserStakes(user1)
+		if len(stakes) != 2 {
+			t.Fatalf("Expected 2 stakes, got %d", len(stakes))
+		}
+
+		if stakes[0].LockPeriod != _30Days {
+			t.Errorf("expected lock period of 30 days, got %v", stakes[0].LockPeriod)
+		}
+
+		if stakes[1].LockPeriod != _90Days {
+			t.Errorf("expected lock period of 90 days, got %v", stakes[1].LockPeriod)
+		}
+	})
+}

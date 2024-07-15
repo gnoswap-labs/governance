@@ -28,13 +28,15 @@ var (
 	gStakers 	   map[std.Address]bool
 	gTotalRewards	*u256.Uint
 	gClaimedRewards	map[std.Address]*u256.Uint
+	gCurrentTime    time.Time
 )
 
 // StakedPosition represents a single staked position.
 type StakedPosition struct {
 	Amount    *u256.Uint
-	StartTime time.Time
 	User std.Address
+	StartTime time.Time
+	LockPeriod time.Duration
 }
 
 // Init initializes the staking system.
@@ -44,6 +46,7 @@ func Init() {
 	gStakers = make(map[std.Address]bool)
 	gTotalRewards = u256.Zero()
 	gClaimedRewards = make(map[std.Address]*u256.Uint)
+	gCurrentTime = time.Now()
 }
 
 // calculateRewardMultiplier calculates the reward multiplier based on the staking duration.
@@ -175,4 +178,96 @@ func GetClaimedRewards(user std.Address) *u256.Uint {
 		return u256.Zero()
 	}
 	return claimed.Clone()
+}
+
+func StakeWithPeriod(user std.Address, amount *u256.Uint, period time.Duration) error {
+	if amount.IsZero() {
+		return errors.New("cannot stake zero amount")
+	}
+
+	if period < 24*time.Hour {
+		return errors.New("minimum lock period is 24 hours (1 day)")
+	}
+
+	position := &StakedPosition{
+		User: user,
+		Amount: amount,
+		StartTime: gCurrentTime,
+		LockPeriod: period,
+	}
+
+	gStakedPositions = append(gStakedPositions, position)
+	gTotalStaked = u256.Zero().Add(gTotalStaked, amount)
+	gStakers[user] = true
+
+	return nil
+}
+
+// Unstake allows a user to unstake their tokens
+func Unstake(user std.Address, amount *u256.Uint) error {
+    if amount.IsZero() {
+        return errors.New("cannot unstake zero amount")
+    }
+
+    var totalUnstaked u256.Uint
+    remainingAmount := amount.Clone()
+    currentTime := time.Now()
+
+    for i := 0; i < len(gStakedPositions); i++ {
+        position := gStakedPositions[i]
+        if position.User != user {
+            continue
+        }
+
+        if currentTime.Before(position.StartTime.Add(position.LockPeriod)) {
+            return errors.New("lock period has not ended for one or more positions")
+        }
+
+        if remainingAmount.Cmp(position.Amount) >= 0 {
+            // Unstake entire position
+            totalUnstaked = *u256.Zero().Add(&totalUnstaked, position.Amount)
+            remainingAmount = u256.Zero().Sub(remainingAmount, position.Amount)
+            
+            // Remove this position
+            gStakedPositions = append(gStakedPositions[:i], gStakedPositions[i+1:]...)
+            i-- // Adjust index as we've removed an element
+        } else {
+            // Partially unstake this position
+            position.Amount = u256.Zero().Sub(position.Amount, remainingAmount)
+            totalUnstaked = *u256.Zero().Add(&totalUnstaked, remainingAmount)
+            remainingAmount = u256.Zero()
+            break
+        }
+
+        if remainingAmount.IsZero() {
+            break
+        }
+    }
+
+    if totalUnstaked.IsZero() {
+        return errors.New("no stakes found or insufficient stake amount")
+    }
+
+    if !remainingAmount.IsZero() {
+        return errors.New("insufficient staked amount")
+    }
+
+    gTotalStaked = u256.Zero().Sub(gTotalStaked, &totalUnstaked)
+
+    // Check if user has any remaining stakes
+    hasStakes := false
+    for _, position := range gStakedPositions {
+        if position.User == user {
+            hasStakes = true
+            break
+        }
+    }
+    if !hasStakes {
+        delete(gStakers, user)
+    }
+
+    // Here you would typically transfer the unstaked tokens back to the user
+    // For example: token.Transfer(user, totalUnstaked)
+
+    return nil
 }
