@@ -3,6 +3,7 @@ package staking
 
 import (
 	"errors"
+	"std"
 	"time"
 
 	u256 "gno.land/p/demo/uint256"
@@ -24,18 +25,21 @@ var (
 var (
 	gTotalStaked     *u256.Uint
 	gStakedPositions []*StakedPosition
+	gStakers 	   map[std.Address]bool
 )
 
 // StakedPosition represents a single staked position.
 type StakedPosition struct {
 	Amount    *u256.Uint
 	StartTime time.Time
+	User std.Address
 }
 
 // Init initializes the staking system.
 func Init() {
 	gTotalStaked = u256.Zero()
 	gStakedPositions = make([]*StakedPosition, 0)
+	gStakers = make(map[std.Address]bool)
 }
 
 // calculateRewardMultiplier calculates the reward multiplier based on the staking duration.
@@ -91,4 +95,33 @@ func GetLastStakedPosition() *StakedPosition {
 		return nil
 	}
 	return gStakedPositions[len(gStakedPositions)-1]
+}
+
+func StakeForUser(user std.Address, amount *u256.Uint) {
+	position := &StakedPosition{
+		Amount:    amount,
+		StartTime: time.Now(), // time.Now() retreives the current block time
+		User: user,
+	}
+	gStakedPositions = append(gStakedPositions, position)
+	gTotalStaked = u256.Zero().Add(gTotalStaked, amount)
+	gStakers[user] = true
+}
+
+func GetUserStakes(user std.Address) []*StakedPosition {
+	var userStakes []*StakedPosition
+	for _, stake := range gStakedPositions {
+		if stake.User == user {
+			userStakes = append(userStakes, stake)
+		}
+	}
+	return userStakes
+}
+
+func GetTotalStakedAmount() *u256.Uint {
+	return gTotalStaked.Clone()
+}
+
+func GetTotalStakers() int {
+	return len(gStakers)
 }
