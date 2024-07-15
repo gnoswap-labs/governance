@@ -1,0 +1,94 @@
+// ref: https://docs.gnoswap.io/core-concepts/liquidity-mining#warm-up-periods
+package staking
+
+import (
+	"errors"
+	"time"
+
+	u256 "gno.land/p/demo/uint256"
+)
+
+const (
+	WarmUpPeriod1 = 5 * 24 * time.Hour	// 5 days
+	WarmUpPeriod2 = 10 * 24 * time.Hour	// 10 days
+	WarmUpPeriod3 = 30 * 24 * time.Hour	// 30 days
+)
+
+var (
+	Multiplier1 = u256.NewUint(30)  // 0.3
+	Multiplier2 = u256.NewUint(50)  // 0.5
+	Multiplier3 = u256.NewUint(70)  // 0.7
+	Multiplier4 = u256.NewUint(100) // 1.0
+)
+
+var (
+	gTotalStaked     *u256.Uint
+	gStakedPositions []*StakedPosition
+)
+
+// StakedPosition represents a single staked position.
+type StakedPosition struct {
+	Amount    *u256.Uint
+	StartTime time.Time
+}
+
+// Init initializes the staking system.
+func Init() {
+	gTotalStaked = u256.Zero()
+	gStakedPositions = make([]*StakedPosition, 0)
+}
+
+// calculateRewardMultiplier calculates the reward multiplier based on the staking duration.
+func calculateRewardMultiplier(stakeDuration time.Duration) *u256.Uint {
+	switch {
+	case stakeDuration < WarmUpPeriod1:
+		return Multiplier1
+	case stakeDuration < WarmUpPeriod2:
+		return Multiplier2
+	case stakeDuration < WarmUpPeriod3:
+		return Multiplier3
+	default:
+		return Multiplier4
+	}
+}
+
+// calculateReward calculates the reward for staked position.
+func calculateReward(position *StakedPosition, baseReward *u256.Uint) *u256.Uint {
+	stakeDuration := time.Since(position.StartTime)
+	multiplier := calculateRewardMultiplier(stakeDuration)
+
+	// multiply the base reward by multiplier
+	// (divided by 100 as multipliers are in percentage)
+	adjuestedReward := u256.Zero().Mul(baseReward, multiplier)
+	return u256.Zero().Div(adjuestedReward, u256.NewUint(100))
+}
+
+// Stake adds a new staking position.
+func Stake(amount *u256.Uint) error {
+	if amount.IsZero() {
+		return errors.New("cannot stake zero amount")
+	}
+
+	position := &StakedPosition{
+		Amount:    amount,
+		StartTime: time.Now(),
+	}
+
+	gStakedPositions = append(gStakedPositions, position)
+	gTotalStaked = u256.Zero().Add(gTotalStaked, amount)
+
+	return nil
+}
+
+// GetTotalStaked returns the total staked amount.
+func GetTotalStaked() *u256.Uint {
+	return gTotalStaked.Clone()
+}
+
+// GetLastStakedPosition returns the last staked position.
+func GetLastStakedPosition() *StakedPosition {
+	if len(gStakedPositions) == 0 {
+		return nil
+	}
+	return gStakedPositions[len(gStakedPositions)-1]
+}
