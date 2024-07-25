@@ -4,7 +4,6 @@ import (
 	"std"
 
 	"gno.land/p/demo/grc/grc20"
-	"gno.land/p/demo/ufmt"
 	u256 "gno.land/p/demo/uint256"
 )
 

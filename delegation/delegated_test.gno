@@ -17,6 +17,9 @@ type mockGRC20 struct {
 	name        string
 	symbol      string
 	decimals    uint8
+
+	// apply a custom rule for specific conditions
+	customTransferFrom func(from, to std.Address, amount uint64) error
 }
 
 // newMockGRC20 creates a new instance of mockGRC20
@@ -74,9 +77,14 @@ func (m *mockGRC20) Approve(spender std.Address, amount uint64) error {
 }
 
 func (m *mockGRC20) TransferFrom(from, to std.Address, amount uint64) error {
+	if m.customTransferFrom != nil {
+		return m.customTransferFrom(from, to, amount)
+	}
+
 	if m.balances[from] < amount {
 		return errors.New("insufficient balance")
 	}
+
 	m.balances[from] -= amount
 	m.balances[to] += amount
 	return nil
@@ -169,16 +177,20 @@ func TestDeposit(t *testing.T) {
 	mockToken.balances[owner] = initialBalance
 	mockToken.Approve(std.GetOrigPkgAddr(), allowance)
 
-	// Mock the token transfer
-	oldTransferFrom := mockToken.TransferFrom
-	mockToken.TransferFrom = func(from, to std.Address, amount uint64) error {
-		if from == owner && to == std.GetOrigPkgAddr() && amount <= allowance {
-			mockToken.balances[from] -= amount
-			mockToken.balances[to] += amount
-			return nil
-		}
-		return oldTransferFrom(from, to, amount)
-	}
+	mockToken.customTransferFrom = func(from, to std.Address, amount uint64) error {
+        if from == owner && to == std.GetOrigPkgAddr() && amount <= allowance {
+            mockToken.balances[from] -= amount
+            mockToken.balances[to] += amount
+            return nil
+        }
+        // Fall back to original behavior
+        if mockToken.balances[from] < amount {
+            return errors.New("insufficient balance")
+        }
+        mockToken.balances[from] -= amount
+        mockToken.balances[to] += amount
+        return nil
+    }
 
 	// Call Deposit
 	Deposit()
