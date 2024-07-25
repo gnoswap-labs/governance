@@ -179,7 +179,7 @@ func Vote(id [32]byte, yes bool) {
 		panic("VOTING_ENDED")
 	}
 
-	pastVote, voted := gGovernor.vote[id][voter]
+	_, voted := gGovernor.vote[id][voter]
 	if voted {
 		panic("ALREADY_VOTED")
 	}
@@ -420,12 +420,13 @@ type Call struct {
 func hashCalls(calls []Call) [32]byte {
 	var buf bytes.Buffer
 	buf.WriteString("governance::governor::Governor::hash_calls")
+
+	selectorBytes := make([]byte, 4)
 	for _, call := range calls {
 		addrStr := call.To.String()
 		buf.WriteString(addrStr)
 
 		// convert the selector to big endian bytes directly
-		selectorBytes := make([]byte, 4)
 		selectorBytes[0] = byte(call.Selector >> 24)
 		selectorBytes[1] = byte(call.Selector >> 16)
 		selectorBytes[2] = byte(call.Selector >> 8)
