@@ -266,8 +266,5 @@ func Unstake(user std.Address, amount *u256.Uint) error {
 		delete(gStakers, user)
 	}
 
-	// Here you would typically transfer the unstaked tokens back to the user
-	// For example: token.Transfer(user, totalUnstaked)
-
 	return nil
 }
