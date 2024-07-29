@@ -193,10 +193,17 @@ func Vote(id [32]byte, yes bool) {
 		panic("FAILED_TO_GET_WEIGHT")
 	}
 
+	var overflow bool
 	if yes {
-		proposal.Yea = u256.Zero().Add(proposal.Yea, weight)
+		proposal.Yea, overflow = new(u256.Uint).AddOverflow(proposal.Yea, weight)
+		if overflow {
+			panic("OVERFLOW")
+		}
 	} else {
-		proposal.Nay = u256.Zero().Add(proposal.Nay, weight)
+		proposal.Nay, overflow = new(u256.Uint).AddOverflow(proposal.Nay, weight)
+		if overflow {
+			panic("OVERFLOW")
+		}
 	}
 
 	gGovernor.proposals[id] = proposal
