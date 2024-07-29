@@ -3,10 +3,13 @@ package airdrop
 import (
 	"errors"
 	"std"
+	"strconv"
+	"strings"
 	"time"
 
 	"gno.land/p/demo/grc/grc20"
-	"gno.land/p/demo/uint256"
+	"gno.land/p/demo/ufmt"
+	u256 "gno.land/p/demo/uint256"
 )
 
 var (
@@ -24,7 +27,7 @@ var timeNow = time.Now
 type Claim struct {
 	ID      uint64
 	Claimee std.Address
-	Amount  *uint256.Uint
+	Amount  *u256.Uint
 }
 
 // Config represents the airdrop configuration
@@ -184,4 +187,23 @@ func (a *Airdrop) GetConfig() Config {
 
 func (a *Airdrop) GetAddress() std.Address {
 	return a.address
+}
+
+// ParseAndProcessAirdrop parses airdrop data in the format "address=amount" and processes it
+func ParseAndProcessAirdrop(data string) (address std.Address, amount *u256.Uint, err error) {
+    parts := strings.Split(data, "=")
+    if len(parts) != 2 {
+        // panic("Invalid airdrop data format")
+		return "", nil, ufmt.Errorf("Invalid airdrop data format")
+    }
+
+    address = std.Address(parts[0])
+    amountStr := strings.TrimSuffix(parts[1], "ugnot")
+    
+	amount, err = u256.FromDecimal(amountStr)
+    if err != nil {
+		return "", nil, ufmt.Errorf("Invalid amount: %s", err.Error())
+    }
+
+	return address, amount, nil
 }

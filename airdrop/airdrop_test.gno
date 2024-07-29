@@ -10,7 +10,7 @@ import (
 	"gno.land/p/demo/merkle"
 	"gno.land/p/demo/testutils"
 	"gno.land/p/demo/ufmt"
-	"gno.land/p/demo/uint256"
+	u256 "gno.land/p/demo/uint256"
 )
 
 // mockGRC20 is a mock implementation of the IGRC20 interface for testing
@@ -150,7 +150,7 @@ func TestClaim(t *testing.T) {
 	claim := Claim{
 		ID:      1,
 		Claimee: claimeeAddress,
-		Amount:  uint256.NewUint(100000),
+		Amount:  u256.NewUint(100000),
 	}
 
 	// Test successful claim
@@ -185,7 +185,7 @@ func TestClaim(t *testing.T) {
 	bigClaim := Claim{
 		ID:      2,
 		Claimee: claimeeAddress,
-		Amount:  uint256.NewUint(1000000), // More than the remaining balance
+		Amount:  u256.NewUint(1000000), // More than the remaining balance
 	}
 
 	defer func() {
@@ -215,7 +215,7 @@ func TestClaim64(t *testing.T) {
 		claims[i] = Claim{
 			ID:      uint64(i * 64), // Ensure first claim ID is multiple of 64
 			Claimee: std.Address(ufmt.Sprintf("claimee%d", i)),
-			Amount:  uint256.NewUint(1000), // Each claim is for 1000 tokens
+			Amount:  u256.NewUint(1000), // Each claim is for 1000 tokens
 		}
 	}
 
@@ -249,7 +249,7 @@ func TestClaim64(t *testing.T) {
 		bigClaims[i] = Claim{
 			ID:      uint64((i + 1) * 64),
 			Claimee: std.Address(ufmt.Sprintf("claimee%d", i)),
-			Amount:  uint256.NewUint(20000), // Each claim is for 20000 tokens, which is more than the remaining balance
+			Amount:  u256.NewUint(20000), // Each claim is for 20000 tokens, which is more than the remaining balance
 		}
 	}
 
@@ -347,4 +347,64 @@ func TestRefund(t *testing.T) {
 	//     }()
 	//     airdrop.Refund()
 	// })
+}
+
+func TestParseAirdropData(t *testing.T) {
+	tests := []struct {
+		name           string
+		input          string
+		expectedAddr   string
+		expectedAmount string
+		expectError    bool
+	}{
+		{
+			name:           "Valid input",
+			input:          "g1p3ucd3ptpw902fluyjzhq3ffgq4ntddatev7s5=42027010477582ugnot",
+			expectedAddr:   "g1p3ucd3ptpw902fluyjzhq3ffgq4ntddatev7s5",
+			expectedAmount: "42027010477582",
+			expectError:    false,
+		},
+		{
+			name:           "Valid input without ugnot suffix",
+			input:          "g1p3ucd3ptpw902fluyjzhq3ffgq4ntddatev7s5=42027010477582",
+			expectedAddr:   "g1p3ucd3ptpw902fluyjzhq3ffgq4ntddatev7s5",
+			expectedAmount: "42027010477582",
+			expectError:    false,
+		},
+		{
+			name:        "Invalid format",
+			input:       "invalid_format",
+			expectError: true,
+		},
+		{
+			name:        "Invalid amount",
+			input:       "g1p3ucd3ptpw902fluyjzhq3ffgq4ntddatev7s5=invalid_amount",
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			addr, amount, err := ParseAndProcessAirdrop(tt.input)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected an error, but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+
+				if addr.String() != tt.expectedAddr {
+					t.Errorf("Expected address %s, but got %s", tt.expectedAddr, addr)
+				}
+
+				expectedAmount, _ := u256.FromDecimal(tt.expectedAmount)
+				if amount.Cmp(expectedAmount) != 0 {
+					t.Errorf("Expected amount %s, but got %s", expectedAmount.ToString(), amount.ToString())
+				}
+			}
+		})
+	}
 }
