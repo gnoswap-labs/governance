@@ -47,8 +47,8 @@ type DelegatedToken struct {
 
 var gDelegatedToken *DelegatedToken
 
-// Init initializes the DelegatedToken contract
-func Init(staker std.Address, token grc20.Token, name string, symbol string) {
+// New creates a new instance of the DelegatedToken.
+func New(staker std.Address, token grc20.Token, name string, symbol string) {
 	gDelegatedToken = &DelegatedToken{
 		staker:      staker,
 		token:       token,
@@ -94,8 +94,6 @@ func Delegate(owner, to std.Address) {
 	if currDelegatee != to {
 		gDelegatedToken.delegatedTo[owner] = to
 
-		// TODO: move delegates ?
-
 		std.Emit(
 			"Delegation",
 			"from", owner.String(),
@@ -115,7 +113,7 @@ func Deposit() {
 	token := gDelegatedToken.token
 
 	// get the approved amount
-	allowance := token.Allowance(caller, std.GetOrigPkgAddr())
+	allowance := token.Allowance(caller, std.CurrentRealm().Addr())
 	if allowance == 0 {
 		panic("no allowance")
 	}

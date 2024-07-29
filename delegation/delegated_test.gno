@@ -94,7 +94,7 @@ func (m *mockGRC20) TransferFrom(from, to std.Address, amount uint64) error {
 
 func TestGetStaker(t *testing.T) {
 	mockStaker := testutils.TestAddress("mockStaker")
-	Init(mockStaker, nil, "test token", "TST")
+	New(mockStaker, nil, "test token", "TST")
 
 	result := GetStaker()
 	if result != mockStaker {
@@ -105,7 +105,7 @@ func TestGetStaker(t *testing.T) {
 func TestDelegatedTo(t *testing.T) {
 	// Initialize the DelegatedToken
 	mockStaker := testutils.TestAddress("mockStaker")
-	Init(mockStaker, nil, "Test Token", "TST")
+	New(mockStaker, nil, "Test Token", "TST")
 
 	// Create test addresses
 	owner1 := testutils.TestAddress("owner1")
@@ -164,7 +164,7 @@ func TestDelegatedTo(t *testing.T) {
 func TestDeposit(t *testing.T) {
 	mockTokenAddress := testutils.TestAddress("mockToken")
 	mockToken := newMockGRC20("Test Token", "TST", 18)
-	Init(mockTokenAddress, mockToken, "Test Token", "TST")
+	New(mockTokenAddress, mockToken, "Test Token", "TST")
 
 	// Set the mock token as the staker (which is also the token in this case)
 	gDelegatedToken.staker = mockTokenAddress
@@ -217,7 +217,7 @@ func TestDeposit(t *testing.T) {
 func TestDepositAmount(t *testing.T) {
 	mockStaker := testutils.TestAddress("mockStaker")
 	mockToken := newMockGRC20("Test Token", "TST", 18)
-	Init(mockStaker, mockToken, "Test Token", "TST")
+	New(mockStaker, mockToken, "Test Token", "TST")
 
 	owner := testutils.TestAddress("owner")
 	std.TestSetOrigCaller(owner)
@@ -262,7 +262,7 @@ func TestDepositAmount(t *testing.T) {
 func TestDepositZeroAmount(t *testing.T) {
 	mockStaker := testutils.TestAddress("mockStaker")
 	mockToken := newMockGRC20("Test Token", "TST", 18)
-	Init(mockStaker, mockToken, "Test Token", "TST")
+	New(mockStaker, mockToken, "Test Token", "TST")
 
 	owner := testutils.TestAddress("owner")
 	std.TestSetOrigCaller(owner)
@@ -290,7 +290,7 @@ func TestDepositZeroAmount(t *testing.T) {
 func TestWithdraw(t *testing.T) {
 	mockStaker := testutils.TestAddress("mockStaker")
 	mockToken := newMockGRC20("Test Token", "TST", 18)
-	Init(mockStaker, mockToken, "Test Token", "TST")
+	New(mockStaker, mockToken, "Test Token", "TST")
 
 	owner := testutils.TestAddress("owner")
 	std.TestSetOrigCaller(owner)
@@ -341,7 +341,7 @@ func TestWithdraw(t *testing.T) {
 func TestWithdrawAmount(t *testing.T) {
 	mockStaker := testutils.TestAddress("mockStaker")
 	mockToken := newMockGRC20("Test Token", "TST", 18)
-	Init(mockStaker, mockToken, "Test Token", "TST")
+	New(mockStaker, mockToken, "Test Token", "TST")
 
 	owner := testutils.TestAddress("owner")
 	std.TestSetOrigCaller(owner)
