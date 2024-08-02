@@ -77,10 +77,10 @@ type ProposalInfo struct {
 	ExecutionState ExecutionState
 
 	// How many yes votes have been collected
-	Yea *u256.Uint
+	Yea *u256.Uint // TODO: u64
 
 	// How many no votes have been collected
-	Nay *u256.Uint
+	Nay *u256.Uint // TODO: u64
 
 	// The version of the config that this proposal was created with
 	ConfigVersion uint64

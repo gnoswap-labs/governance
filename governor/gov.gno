@@ -36,6 +36,7 @@ func Init(staker IStakerDispatcher, config Config) {
 // Propose creates a new proposal with the given set of calls.
 // It checks if the proposer is eligible to create a proposal and if they don't have an active proposal.
 // Returns the proposal ID and an error if the proposal creation fails.
+// TODO: change to use primitive types. (getter/setter)
 func Propose(calls []Call) ([32]byte, error) {
 	if gGovernor == nil {
 		panic("Governor not initialized")
@@ -268,6 +269,8 @@ func Cancel(id [32]byte) {
 // It checks various conditions such as voting period, execution window, quorum, and majority.
 // Returns the results of the executed calls.
 // Panics if any of the execution conditions are not met.
+//
+// XXX: Dynamic Call?
 func Execute(id [32]byte, calls []Call) [][]byte {
 	if gGovernor == nil {
 		panic("Governor not initialized")
