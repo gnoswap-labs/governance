@@ -103,69 +103,49 @@ func Delegate(owner, to std.Address) {
 
 // Deposit transfers the approved amount of the staked token to this contract
 // and mints an GRC20 representing the staked amount.
-func Deposit() {
+func Deposit(amount, caller string) {
 	if gDelegatedToken == nil {
 		panic("DelegatedToken not initialized")
 	}
 
-	caller := std.GetOrigCaller()
+	callerAddr := std.Address(caller)
 	token := gDelegatedToken.token
 
-	// get the approved amount
-	allowance := token.Allowance(caller, std.CurrentRealm().Addr())
-	if allowance == 0 {
-		panic("no allowance")
-	}
-
-	err := token.TransferFrom(caller, std.GetOrigPkgAddr(), allowance)
+	amountUint, err := u256.FromDecimal(amount)
 	if err != nil {
-		panic("transfer failed: " + err.Error())
+		panic("invalid amount: " + err.Error())
 	}
 
-	// mint equivalent amount of delegated tokens
-	amount := u256.NewUint(allowance)
-	mintDelegatedTokens(caller, amount)
-
-	std.Emit(
-		"Deposit",
-		"from", caller.String(),
-		"amount", amount.ToString(),
-	)
-}
-
-// DepositAmount deposites a specific amount of tokens
-func DepositAmount(amount *u256.Uint) {
-	if gDelegatedToken == nil {
-		panic("DelegatedToken not initialized")
+	// check balance
+	balance := token.BalanceOf(callerAddr)
+	if u256.NewUint(balance).Cmp(amountUint) < 0 {
+		panic("insufficient balance")
 	}
-
-	caller := std.GetOrigCaller()
-	token := gDelegatedToken.token
 
 	// check allowance
-	allowance := token.Allowance(caller, std.GetOrigPkgAddr())
-	if u256.NewUint(allowance).Cmp(amount) < 0 {
+	allowance := token.Allowance(callerAddr, std.GetOrigPkgAddr())
+	if u256.NewUint(allowance).Cmp(amountUint) < 0 {
 		panic("insufficient allowance")
 	}
 
 	// transfer tokens from caller to this contract
-	err := token.TransferFrom(caller, std.GetOrigPkgAddr(), amount.Uint64())
+	err = token.TransferFrom(callerAddr, std.GetOrigPkgAddr(), amountUint.Uint64())
 	if err != nil {
 		panic("transfer failed: " + err.Error())
 	}
 
 	// mint equivalent amount of delegated tokens
-	mintDelegatedTokens(caller, amount)
+	mintDelegatedTokens(callerAddr, amountUint)
 
 	std.Emit(
 		"DepositAmount",
-		"from", caller.String(),
-		"amount", amount.ToString(),
+		"from", caller,
+		"amount", amount,
 	)
 }
 
 // Withdraw withdraws the entire staked balance from the contract for the caller
-func Withdraw(amount string, caller string) {
+func Withdraw(amount, caller string) {
 	if gDelegatedToken == nil {
 		panic("DelegatedToken not initialized")
 	}

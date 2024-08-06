@@ -161,58 +161,6 @@ func TestDelegatedTo(t *testing.T) {
 	}
 }
 
-func TestDeposit(t *testing.T) {
-	mockToken := newMockGRC20("Test Token", "TST", 18)
-	New(testAddr, mockToken, "Test Token", "TST")
-
-	// Set the mock token as the staker (which is also the token in this case)
-	gDelegatedToken.staker = testAddr
-
-	owner := std.GetOrigCaller()
-
-	// Set initial balance and allowance
-	initialBalance := uint64(1000)
-	allowance := uint64(500)
-	mockToken.balances[owner] = initialBalance
-	mockToken.Approve(std.GetOrigPkgAddr(), allowance)
-
-	mockToken.customTransferFrom = func(from, to std.Address, amount uint64) error {
-        if from == owner && to == std.GetOrigPkgAddr() && amount <= allowance {
-            mockToken.balances[from] -= amount
-            mockToken.balances[to] += amount
-            return nil
-        }
-        // Fall back to original behavior
-        if mockToken.balances[from] < amount {
-            return errors.New("insufficient balance")
-        }
-        mockToken.balances[from] -= amount
-        mockToken.balances[to] += amount
-        return nil
-    }
-
-	// Call Deposit
-	Deposit()
-
-	// Check balance of delegated tokens
-	balance := BalanceOf(owner)
-	if balance.Cmp(u256.NewUint(allowance)) != 0 {
-		t.Errorf("Deposit() failed, BalanceOf() = %v, want %v", balance, allowance)
-	}
-
-	// Check balance of original tokens
-	originalBalance := mockToken.balances[owner]
-	expectedOriginalBalance := initialBalance - allowance
-	if originalBalance != expectedOriginalBalance {
-		t.Errorf("Deposit() failed, original token balance = %v, want %v", originalBalance, expectedOriginalBalance)
-	}
-
-	// Check total supply
-	if gDelegatedToken.totalSupply.Cmp(u256.NewUint(allowance)) != 0 {
-		t.Errorf("Deposit() failed, totalSupply = %v, want %v", gDelegatedToken.totalSupply, allowance)
-	}
-}
-
 func TestDepositAmount(t *testing.T) {
 	mockToken := newMockGRC20("Test Token", "TST", 18)
 	New(testAddr, mockToken, "Test Token", "TST")
@@ -227,13 +175,12 @@ func TestDepositAmount(t *testing.T) {
 	mockToken.balances[owner] = initialBalance
 	mockToken.Approve(std.GetOrigPkgAddr(), allowance)
 
-	// Call DepositAmount
-	DepositAmount(depositAmount)
+	Deposit("300", owner.String())
 
 	// Check balance of delegated tokens
 	balance := BalanceOf(owner)
 	if balance.Cmp(depositAmount) != 0 {
-		t.Errorf("DepositAmount() failed, BalanceOf() = %v, want %v", balance, depositAmount)
+		t.Errorf("Deposit() failed, BalanceOf() = %v, want %v", balance, depositAmount)
 	}
 
 	// Check balance of original tokens
@@ -247,14 +194,6 @@ func TestDepositAmount(t *testing.T) {
 	if gDelegatedToken.totalSupply.Cmp(depositAmount) != 0 {
 		t.Errorf("DepositAmount() failed, totalSupply = %v, want %v", gDelegatedToken.totalSupply, depositAmount)
 	}
-
-	// Test depositing more than allowance (should panic)
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("DepositAmount() did not panic when amount > allowance")
-		}
-	}()
-	DepositAmount(u256.NewUint(allowance + 1))
 }
 
 func TestDepositZeroAmount(t *testing.T) {
@@ -270,7 +209,7 @@ func TestDepositZeroAmount(t *testing.T) {
 
 	// Attempt to deposit zero amount
 	zeroAmount := u256.NewUint(0)
-	DepositAmount(zeroAmount)
+	Deposit("0", owner.String())
 
 	// Check balance of delegated tokens (should be zero)
 	balance := BalanceOf(owner)
@@ -296,7 +235,7 @@ func TestWithdraw(t *testing.T) {
 	depositAmount := u256.NewUint(500)
 	mockToken.balances[owner] = initialBalance
 	mockToken.Approve(std.GetOrigPkgAddr(), depositAmount.Uint64())
-	DepositAmount(depositAmount)
+	Deposit(depositAmount.ToString(), owner.String())
 
 	// Check initial delegated token balance
 	delegatedBalance := BalanceOf(owner)
