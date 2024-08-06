@@ -42,6 +42,9 @@ type DelegatedToken struct {
 
 	// symbol is the symbol of the delegated token.
 	symbol      string
+
+	// decimals is the number of decimal places for the delegated token.
+	decimals   uint8
 }
 
 var gDelegatedToken *DelegatedToken
@@ -68,35 +71,39 @@ func GetStaker() std.Address {
 }
 
 // GetDelegatedTo returns the address to whom the owner is delegated.
-func GetDelegatedTo(owner std.Address) std.Address {
+func GetDelegatedTo(owner string) std.Address {
 	if gDelegatedToken == nil {
 		panic("DelegatedToken not initialized")
 	}
 
-	delegatee, exists := gDelegatedToken.delegatedTo[owner]
+	ownerAddr := std.Address(owner)
+	delegatee, exists := gDelegatedToken.delegatedTo[ownerAddr]
 	if !exists {
 		// if not explicitly delegated, return owner
-		return owner
+		return ownerAddr
 	}
 
 	return delegatee
 }
 
-func Delegate(owner, to std.Address) {
+func Delegate(owner, to string) {
 	if gDelegatedToken == nil {
 		panic("DelegatedToken not initialized")
 	}
 
+	ownerAddr := std.Address(owner)
+	toAddr := std.Address(to)
+
 	currDelegatee := GetDelegatedTo(owner)
 
 	// if the new delegation is different from the current one
-	if currDelegatee != to {
-		gDelegatedToken.delegatedTo[owner] = to
+	if currDelegatee != toAddr {
+		gDelegatedToken.delegatedTo[ownerAddr] = toAddr
 
 		std.Emit(
 			"Delegation",
-			"from", owner.String(),
-			"to", to.String(),
+			"from", owner,
+			"to", to,
 		)
 	}
 }
@@ -135,7 +142,7 @@ func Deposit(amount, caller string) {
 	}
 
 	// mint equivalent amount of delegated tokens
-	mintDelegatedTokens(callerAddr, amountUint)
+	mintDelegatedTokens(caller, amount)
 
 	std.Emit(
 		"DepositAmount",
@@ -151,7 +158,7 @@ func Withdraw(amount, caller string) {
 	}
 
 	callerAddr := std.Address(caller)
-	balance := BalanceOf(callerAddr)
+	balance := BalanceOf(caller)
 
 	if balance.IsZero() {
 		panic("no balance to withdraw")
@@ -186,21 +193,28 @@ func Withdraw(amount, caller string) {
 }
 
 // mintDelegatedTokens mints the specified amount of delegated tokens for the given account (address).
-func mintDelegatedTokens(to std.Address, amount *u256.Uint) {
-	if gDelegatedToken.balances[to] == nil {
-		gDelegatedToken.balances[to] = u256.Zero()
+func mintDelegatedTokens(to, amount string) {
+	toAddr := std.Address(to)
+	if gDelegatedToken.balances[toAddr] == nil {
+		gDelegatedToken.balances[toAddr] = u256.Zero()
 	}
-	gDelegatedToken.balances[to].Add(gDelegatedToken.balances[to], amount)
-	gDelegatedToken.totalSupply.Add(gDelegatedToken.totalSupply, amount)
+
+	amountUint, err := u256.FromDecimal(amount)
+	if err != nil {
+		panic("invalid amount: " + err.Error())
+	}
+	gDelegatedToken.balances[toAddr].Add(gDelegatedToken.balances[toAddr], amountUint)
+	gDelegatedToken.totalSupply.Add(gDelegatedToken.totalSupply, amountUint)
 }
 
 // BalanceOf returns the balance of delegated tokens for the given account.
-func BalanceOf(account std.Address) *u256.Uint {
+func BalanceOf(account string) *u256.Uint {
 	if gDelegatedToken == nil {
 		panic("DelegatedToken not initialized")
 	}
 
-	balance, exists := gDelegatedToken.balances[account]
+	accountAddr := std.Address(account)
+	balance, exists := gDelegatedToken.balances[accountAddr]
 	if !exists {
 		return u256.Zero()
 	}

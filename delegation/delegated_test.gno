@@ -104,64 +104,72 @@ func TestGetStaker(t *testing.T) {
 }
 
 func TestDelegatedTo(t *testing.T) {
-	// Initialize the DelegatedToken
 	New(testAddr, nil, "Test Token", "TST")
 
 	// Create test addresses
-	owner1 := testutils.TestAddress("owner1")
-	owner2 := testutils.TestAddress("owner2")
-	delegate1 := testutils.TestAddress("delegate1")
-	delegate2 := testutils.TestAddress("delegate2")
+	owner1Addr := testutils.TestAddress("owner1")
+	owner1 := owner1Addr.String()
+
+	owner2Addr := testutils.TestAddress("owner2")
+	owner2 := owner2Addr.String()
+
+	delegate1Addr := testutils.TestAddress("delegate1")
+	delegate1 := delegate1Addr.String()
+
+	delegate2Addr := testutils.TestAddress("delegate2")
+	delegate2 := delegate2Addr.String()
 
 	// Test 1: Initial state - should be delegated to self
 	result := GetDelegatedTo(owner1)
-	if result != owner1 {
+	if result != owner1Addr {
 		t.Errorf("Initial GetDelegatedTo(owner1) = %v, want %v", result, owner1)
 	}
 
 	// Test 2: Delegate owner1 to delegate1
 	Delegate(owner1, delegate1)
 	result = GetDelegatedTo(owner1)
-	if result != delegate1 {
+	if result != delegate1Addr {
 		t.Errorf("After delegation, GetDelegatedTo(owner1) = %v, want %v", result, delegate1)
 	}
 
 	// Test 3: Delegate owner2 to delegate2
 	Delegate(owner2, delegate2)
 	result = GetDelegatedTo(owner2)
-	if result != delegate2 {
+	if result != delegate2Addr {
 		t.Errorf("After delegation, GetDelegatedTo(owner2) = %v, want %v", result, delegate2)
 	}
 
 	// Test 4: Check owner1's delegation hasn't changed
 	result = GetDelegatedTo(owner1)
-	if result != delegate1 {
+	if result != delegate1Addr {
 		t.Errorf("After owner2 delegation, GetDelegatedTo(owner1) = %v, want %v", result, delegate1)
 	}
 
 	// Test 5: Change owner1's delegation
 	Delegate(owner1, delegate2)
 	result = GetDelegatedTo(owner1)
-	if result != delegate2 {
+	if result != delegate2Addr {
 		t.Errorf("After changing delegation, GetDelegatedTo(owner1) = %v, want %v", result, delegate2)
 	}
 
 	// Test 6: Delegate back to self
 	Delegate(owner1, owner1)
 	result = GetDelegatedTo(owner1)
-	if result != owner1 {
+	if result != owner1Addr {
 		t.Errorf("After delegating to self, GetDelegatedTo(owner1) = %v, want %v", result, owner1)
 	}
 
 	// Test 7: Check non-existent delegation
-	nonExistentOwner := testutils.TestAddress("nonExistent")
+	nonExistentOwnerAddr := testutils.TestAddress("nonExistent")
+	nonExistentOwner := nonExistentOwnerAddr.String()
+
 	result = GetDelegatedTo(nonExistentOwner)
-	if result != nonExistentOwner {
+	if result != nonExistentOwnerAddr {
 		t.Errorf("GetDelegatedTo(nonExistentOwner) = %v, want %v", result, nonExistentOwner)
 	}
 }
 
-func TestDepositAmount(t *testing.T) {
+func TestDeposit(t *testing.T) {
 	mockToken := newMockGRC20("Test Token", "TST", 18)
 	New(testAddr, mockToken, "Test Token", "TST")
 
@@ -178,7 +186,7 @@ func TestDepositAmount(t *testing.T) {
 	Deposit("300", owner.String())
 
 	// Check balance of delegated tokens
-	balance := BalanceOf(owner)
+	balance := BalanceOf(owner.String())
 	if balance.Cmp(depositAmount) != 0 {
 		t.Errorf("Deposit() failed, BalanceOf() = %v, want %v", balance, depositAmount)
 	}
@@ -212,7 +220,7 @@ func TestDepositZeroAmount(t *testing.T) {
 	Deposit("0", owner.String())
 
 	// Check balance of delegated tokens (should be zero)
-	balance := BalanceOf(owner)
+	balance := BalanceOf(owner.String())
 	if !balance.IsZero() {
 		t.Errorf("DepositAmount(0) failed, BalanceOf() = %v, want 0", balance)
 	}
@@ -238,7 +246,7 @@ func TestWithdraw(t *testing.T) {
 	Deposit(depositAmount.ToString(), owner.String())
 
 	// Check initial delegated token balance
-	delegatedBalance := BalanceOf(owner)
+	delegatedBalance := BalanceOf(owner.String())
 	if delegatedBalance.Cmp(depositAmount) != 0 {
 		t.Errorf("Initial BalanceOf() = %v, want %v", delegatedBalance, depositAmount)
 	}
@@ -247,7 +255,7 @@ func TestWithdraw(t *testing.T) {
 	Withdraw(partialWithdrawAmount, owner.String())
 
 	// Check delegated token balance after withdrawal (should be zero)
-	delegatedBalance = BalanceOf(owner)
+	delegatedBalance = BalanceOf(owner.String())
 
 	expectedDelegatedBalance := u256.NewUint(300) // 500 - 200
 	if delegatedBalance.Cmp(expectedDelegatedBalance) != 0 {
