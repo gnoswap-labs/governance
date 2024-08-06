@@ -35,7 +35,7 @@ func main() {
     remainingTokens := uint64(1000)
     id := manager.CreateSnapshot(claimedBitmap, remainingTokens)
 
-    ufmt.Printf("Created snapshot with ID: %d\n", id)
+    println(ufmt.Sprintf("Created snapshot with ID: %d\n", id))
 
     // Retrieve a snapshot
     snap, err := manager.GetSnapshot(id)
@@ -44,8 +44,9 @@ func main() {
         return
     }
 
-    ufmt.Printf("Retrieved snapshot: ID=%d, Timestamp=%d, RemainingTokens=%d\n", 
+    res := ufmt.Sprintf("Retrieved snapshot: ID=%d, Timestamp=%d, RemainingTokens=%d\n", 
                snap.ID, snap.Timestamp, snap.RemainingTokens)
+    println(res)
 
     // Check a specific claim status
     claimed, err := manager.IsClaimedAtSnapshot(id, 64)
@@ -54,7 +55,7 @@ func main() {
         return
     }
 
-    ufmt.Printf("Claim 64 is claimed: %v\n", claimed)
+    println(ufmt.Printf("Claim 64 is claimed: %v\n", claimed))
 }
 ```
 
