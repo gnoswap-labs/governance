@@ -206,7 +206,7 @@ func WithdrawAmount(amount *u256.Uint) {
 	caller := std.GetOrigCaller()
 	balance := BalanceOf(caller)
 
-	if balance.Cmp(amount) < 0 {
+	if balance.Cmp(amount) == -1 {
 		panic("insufficient balance to withdraw")
 	}
 
