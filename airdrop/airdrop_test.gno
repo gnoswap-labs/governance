@@ -13,6 +13,8 @@ import (
 	"gno.land/p/demo/uint256"
 )
 
+var testAddress = testutils.TestAddress("test")
+
 // mockGRC20 is a mock implementation of the IGRC20 interface for testing
 type mockGRC20 struct {
 	balances    map[std.Address]uint64
@@ -89,8 +91,7 @@ func (m *mockGRC20) TransferFrom(from, to std.Address, amount uint64) error {
 ///////////////////////////////////////////////////////////////////////////////////////
 
 func TestClaimIDToBitmapIndex(t *testing.T) {
-	address := std.Address("test")
-	a := NewAirdrop(nil, Config{}, address)
+	a := NewAirdrop(nil, Config{}, testAddress)
 
 	tests := []struct {
 		claimID       uint64
@@ -114,8 +115,7 @@ func TestClaimIDToBitmapIndex(t *testing.T) {
 }
 
 func TestIsClaimed(t *testing.T) {
-	address := std.Address("test")
-	a := NewAirdrop(nil, Config{}, address)
+	a := NewAirdrop(nil, Config{}, testAddress)
 
 	// Test unclaimed
 	if a.IsClaimed(0) {
@@ -137,10 +137,9 @@ func TestIsClaimed(t *testing.T) {
 }
 
 func TestClaim(t *testing.T) {
-	address := std.Address("test")
 	mockToken := NewMockGRC20("Test Token", "TST", 18)
 
-	airdrop := NewAirdrop(mockToken, Config{}, address)
+	airdrop := NewAirdrop(mockToken, Config{}, testAddress)
 
 	// Set up some initial balances
 	airdropAddress := std.GetOrigCaller()
@@ -199,11 +198,10 @@ func TestClaim(t *testing.T) {
 }
 
 func TestClaim64(t *testing.T) {
-	address := std.Address("test")
 	mockToken := NewMockGRC20("Test Token", "TST", 18)
 
 	// Create a new Airdrop instance
-	airdrop := NewAirdrop(mockToken, Config{}, address)
+	airdrop := NewAirdrop(mockToken, Config{}, testAddress)
 
 	// Set up some initial balances
 	airdropAddress := std.GetOrigCaller()
@@ -293,8 +291,8 @@ func TestClaim64(t *testing.T) {
 
 func TestRefund(t *testing.T) {
 	mockToken := NewMockGRC20("Test Token", "TST", 18)
-	refundTo := std.Address("refund_to")
-	airdropAddr := std.Address("airdrop_address")
+	refundTo := testutils.TestAddress("refund_to")
+	airdropAddr := testutils.TestAddress("airdrop")
 
 	// Set up initial balances
 	mockToken.balances[airdropAddr] = 1000000
@@ -375,10 +373,9 @@ func TestRefund(t *testing.T) {
 }
 
 func TestAirdropWithSnapshot(t *testing.T) {
-	address := std.Address("test_airdrop")
 	mockToken := NewMockGRC20("Test Token", "TST", 18)
 
-	airdrop := NewAirdrop(mockToken, Config{}, address)
+	airdrop := NewAirdrop(mockToken, Config{}, testAddress)
 
 	// Set up some initial balances
 	airdropAddress := std.GetOrigCaller()
@@ -389,7 +386,7 @@ func TestAirdropWithSnapshot(t *testing.T) {
 	for i := 0; i < 128; i++ {
 		claims[i] = Claim{
 			ID:      uint64(i * 64), // Ensure first claim ID is multiple of 64
-			Claimee: std.Address(ufmt.Sprintf("claimee%d", i)),
+			Claimee: testutils.TestAddress(ufmt.Sprintf("claimee%d", i)),
 			Amount:  uint256.NewUint(1000), // Each claim is for 1000 tokens
 		}
 	}

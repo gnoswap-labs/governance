@@ -39,7 +39,7 @@ type Config struct {
 type Airdrop struct {
 	token           grc20.Token
 	config          Config
-	claimedBitmap   map[uint64]uint64
+	claimedBitmap   map[uint64]uint64 // claimID -> bitmap
 	address         std.Address
 	snapshotManager *snapshot.Manager
 }
