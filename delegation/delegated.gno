@@ -14,8 +14,7 @@ type IDelegatedToken interface {
 	Delegate(owner, to std.Address)
 	Deposit()
 	DepositAmount(amount *u256.Uint)
-	Withdraw()
-	WithdrawAmount(amount *u256.Uint)
+	Withdraw(amount, caller string)
 }
 
 // DelegatedToken represents a token that can be delegated to another address.
@@ -166,65 +165,43 @@ func DepositAmount(amount *u256.Uint) {
 }
 
 // Withdraw withdraws the entire staked balance from the contract for the caller
-func Withdraw() {
+func Withdraw(amount string, caller string) {
 	if gDelegatedToken == nil {
 		panic("DelegatedToken not initialized")
 	}
 
-	caller := std.GetOrigCaller()
-	balance := BalanceOf(caller)
+	callerAddr := std.Address(caller)
+	balance := BalanceOf(callerAddr)
 
 	if balance.IsZero() {
 		panic("no balance to withdraw")
 	}
 
-	// burn the delegated tokens
-	gDelegatedToken.balances[caller] = u256.Zero()
-	gDelegatedToken.totalSupply = u256.Zero().Sub(gDelegatedToken.totalSupply, balance)
+	amountUint, err := u256.FromDecimal(amount)
+	if err != nil {
+		panic("invalid amount: " + err.Error())
+	}
+
+	if amountUint.Gt(balance) {
+		panic("insufficient balance to withdraw")
+	}
+
+	// burn the specified amount of delegated tokens
+	newBalance := u256.Zero().Sub(balance, amountUint)
+	gDelegatedToken.balances[callerAddr] = newBalance
+	gDelegatedToken.totalSupply = u256.Zero().Sub(gDelegatedToken.totalSupply, amountUint)
 
 	// transfer the original tokens back to the caller
 	token := gDelegatedToken.token
-	err := token.Transfer(caller, balance.Uint64())
+	err = token.Transfer(callerAddr, amountUint.Uint64())
 	if err != nil {
 		panic("transfer failed: " + err.Error())
 	}
 
 	std.Emit(
 		"Withdrawal",
-		"from", caller.String(),
-		"amount", balance.ToString(),
-	)
-}
-
-// WithdrawAmount withdraws specified amount of token
-// from the contract for the caller
-func WithdrawAmount(amount *u256.Uint) {
-	if gDelegatedToken == nil {
-		panic("DelegatedToken not initialized")
-	}
-
-	caller := std.GetOrigCaller()
-	balance := BalanceOf(caller)
-
-	if balance.Cmp(amount) == -1 {
-		panic("insufficient balance to withdraw")
-	}
-
-	// Burn the delegated tokens
-	gDelegatedToken.balances[caller] = u256.Zero().Sub(balance, amount)
-	gDelegatedToken.totalSupply = u256.Zero().Sub(gDelegatedToken.totalSupply, amount)
-
-	// transfer the original token back to the caller
-	token := gDelegatedToken.token
-	err := token.Transfer(caller, amount.Uint64())
-	if err != nil {
-		panic("transfer failed: " + err.Error())
-	}
-
-	std.Emit(
-		"WithdrawAmount",
-		"from", caller.String(),
-		"amount", amount.ToString(),
+		"from", caller,
+		"amount", amount,
 	)
 }
 

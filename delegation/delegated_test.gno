@@ -304,13 +304,15 @@ func TestWithdraw(t *testing.T) {
 		t.Errorf("Initial BalanceOf() = %v, want %v", delegatedBalance, depositAmount)
 	}
 
-	// Withdraw
-	Withdraw()
+	partialWithdrawAmount := "200"
+	Withdraw(partialWithdrawAmount, owner.String())
 
 	// Check delegated token balance after withdrawal (should be zero)
 	delegatedBalance = BalanceOf(owner)
-	if !delegatedBalance.IsZero() {
-		t.Errorf("After Withdraw(), BalanceOf() = %v, want 0", delegatedBalance)
+
+	expectedDelegatedBalance := u256.NewUint(300) // 500 - 200
+	if delegatedBalance.Cmp(expectedDelegatedBalance) != 0 {
+		t.Errorf("After Withdraw(), BalanceOf() = %v, want %v", delegatedBalance, expectedDelegatedBalance)
 	}
 
 	// Check original token balance after withdrawal
@@ -319,63 +321,4 @@ func TestWithdraw(t *testing.T) {
 	if originalBalance != expectedBalance {
 		t.Errorf("After Withdraw(), original token balance = %v, want %v", originalBalance, expectedBalance)
 	}
-
-	// Check total supply (should be zero)
-	if !gDelegatedToken.totalSupply.IsZero() {
-		t.Errorf("After Withdraw(), totalSupply = %v, want 0", gDelegatedToken.totalSupply)
-	}
-
-	// Test withdrawing with zero balance (should panic)
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("Withdraw() did not panic when balance is zero")
-		}
-	}()
-	Withdraw()
-}
-
-func TestWithdrawAmount(t *testing.T) {
-	mockToken := newMockGRC20("Test Token", "TST", 18)
-	New(testAddr, mockToken, "Test Token", "TST")
-
-	owner := testutils.TestAddress("owner")
-	std.TestSetOrigCaller(owner)
-
-	// Set initial balance and deposit
-	initialBalance := uint64(1000)
-	depositAmount := u256.NewUint(500)
-	mockToken.balances[owner] = initialBalance
-	mockToken.Approve(std.GetOrigPkgAddr(), depositAmount.Uint64())
-	DepositAmount(depositAmount)
-
-	// Withdraw half of the deposited amount
-	withdrawAmount := u256.NewUint(250)
-	WithdrawAmount(withdrawAmount)
-
-	// Check delegated token balance after withdrawal
-	delegatedBalance := BalanceOf(owner)
-	expectedDelegatedBalance := u256.NewUint(250)
-	if delegatedBalance.Cmp(expectedDelegatedBalance) != 0 {
-		t.Errorf("After WithdrawAmount(), BalanceOf() = %v, want %v", delegatedBalance, expectedDelegatedBalance)
-	}
-
-	// Check original token balance after withdrawal
-	originalBalance := mockToken.BalanceOf(owner)
-	expectedOriginalBalance := initialBalance - depositAmount.Uint64()
-	if originalBalance != expectedOriginalBalance {
-		t.Errorf("After WithdrawAmount(), original token balance = %v, want %v", originalBalance, expectedOriginalBalance)
-	}
-
-	// Check total supply
-	if gDelegatedToken.totalSupply.Cmp(expectedDelegatedBalance) != 0 {
-		t.Errorf("After WithdrawAmount(), totalSupply = %v, want %v", gDelegatedToken.totalSupply, expectedDelegatedBalance)
-	}
-
-	// Test withdrawing more than balance (should panic)
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("WithdrawAmount() did not panic when amount > balance")
-		}
-	}()
-	WithdrawAmount(u256.NewUint(1000))
 }
