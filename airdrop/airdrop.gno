@@ -191,8 +191,9 @@ func (a *Airdrop) GetAddress() std.Address {
 }
 
 // CreateSnapshot creates a new snapshot of the current state
-func (a *Airdrop) CreateSnapshot() uint64 {
-	return a.snapshotManager.CreateSnapshot(a.claimedBitmap, a.token.BalanceOf(std.GetOrigCaller()))
+func (a *Airdrop) CreateSnapshot(caller string) uint64 {
+	callerAddr := std.Address(caller)
+	return a.snapshotManager.CreateSnapshot(a.claimedBitmap, a.token.BalanceOf(callerAddr))
 }
 
 // IsClaimedAtSnapshot checks if a claim was made at a specific snapshot

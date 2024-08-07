@@ -398,7 +398,8 @@ func TestAirdropWithSnapshot(t *testing.T) {
 	}
 
 	// Create a snapshot after first batch
-	snapshotID := airdrop.CreateSnapshot()
+	caller := airdropAddress.String()
+	snapshotID := airdrop.CreateSnapshot(caller)
 
 	// Process second batch of claims
 	claimed, _ = airdrop.Claim64(claims[64:])
