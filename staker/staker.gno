@@ -42,9 +42,14 @@ func Init(token grc20.Token) {
 	}
 }
 
-// StakeAmount stakes the specified amount for the given delegate
-func StakeAmount(delegate, amount string) error {
+// StakeAmount stakes the specified amount for the given delegate.
+// It transfers tokens from the caller to the contract and updates delegatiomn records.
+func StakeAmount(delegate, amount string) {
 	delegateAddr := std.Address(delegate)
+	if delegateAddr == std.Address("") {
+		panic("invalid delegate address")
+	}
+
 	amountUint, err := u256.FromDecimal(amount)
 	if err != nil {
 		panic(err)
@@ -78,12 +83,11 @@ func StakeAmount(delegate, amount string) error {
 		amount:    gStaker.delegations[delegateAddr].Clone(),
 		timestamp: uint64(time.Now().Unix()),
 	})
-
-	return nil
 }
 
-// WithdrawAmount withdraws the specified amount from the given delegate to the recipient
-func WithdrawAmount(delegate, recipient, amount string) error {
+// WithdrawAmount withdraws the specified amount from the given delegate to the recipient.
+// Only the delegate can call this function to withdraw their staked tokens.
+func WithdrawAmount(delegate, recipient, amount string) {
 	delegateAddr := std.Address(delegate)
     recipientAddr := std.Address(recipient)
 
@@ -126,8 +130,6 @@ func WithdrawAmount(delegate, recipient, amount string) error {
 		amount:    gStaker.delegations[delegateAddr].Clone(),
 		timestamp: uint64(time.Now().Unix()),
 	})
-
-	return nil
 }
 
 // GetDelegatedCumulative gets the cumulative delegated amount * seconds for an address at a certain timestamp.
@@ -248,6 +250,7 @@ func GetCurrentDelegated(delegate string) (string, error) {
 	return res.ToString(), nil
 }
 
+// GetDelegatedAt returns the delegated amount for a delegate at a specific timestamp.
 func GetDelegatedAt(delegate string, timestamp uint64) (string, error) {
 	res := u256.Zero()
 	delegateAddr := std.Address(delegate)

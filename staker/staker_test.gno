@@ -98,10 +98,12 @@ func TestStakeAmount(t *testing.T) {
 	caller := std.GetOrigCaller()
 	token.balances[caller] = 1000
 
-	err := StakeAmount(delegate, "100")
-	if err != nil {
-		t.Errorf("StakeAmount returned an unexpected error: %v", err)
-	}
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("StakeAmount panicked: %v", r)
+		}
+	}()
+	StakeAmount(delegate, "100")
 
 	if gStaker.delegations[delegateAddr].Uint64() != 100 {
 		t.Errorf("StakeAmount did not update delegations correctly")
@@ -130,16 +132,16 @@ func TestWithdrawAmount(t *testing.T) {
 
 	// First, stake some amount
 	token.balances[caller] = 1000
-	err := StakeAmount(delegate, "100")
-	if err != nil {
-		t.Fatalf("Failed to stake initial amount: %v", err)
-	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("WithdrawAmount panicked: %v", r)
+		}
+	}()
+	StakeAmount(delegate, "100")
 
 	// now, try to withdraw
-	err = WithdrawAmount(delegate, recipient, "50")
-	if err != nil {
-		t.Errorf("WithdrawAmount returned an unexpected error: %v", err)
-	}
+	WithdrawAmount(delegate, recipient, "50")
 
 	if gStaker.delegations[caller].Uint64() != 50 {
 		t.Errorf("WithdrawAmount did not update delegations correctly")
@@ -166,10 +168,12 @@ func TestGetAverageDelegated(t *testing.T) {
 	delegateAddr := testutils.TestAddress("delegate")
 	delegate := delegateAddr.String()
 
-	err := StakeAmount(delegate, "0")
-	if err != nil {
-		t.Fatalf("Failed to stake initial amount: %v", err)
-	}
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("GetAverageDelegated panicked: %v", r)
+		}
+	}()
+	StakeAmount(delegate, "0")
 
 	// simulate time passing and additional stakes
 	currentTime := uint64(1000)
@@ -237,10 +241,12 @@ func TestGetAverageDelegatedOverLast(t *testing.T) {
 	delegateAddr := testutils.TestAddress("delegate")
 	delegate := delegateAddr.String()
 
-	err := StakeAmount(delegate, "0")
-	if err != nil {
-		t.Fatalf("Failed to stake initial amount: %v", err)
-	}
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("GetAverageDelegatedOverLast panicked: %v", r)
+		}
+	}()
+	StakeAmount(delegate, "0")
 
 	// Set up delegation history
 	now := uint64(time.Now().Unix())
