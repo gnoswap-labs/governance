@@ -43,9 +43,12 @@ func Init(token grc20.Token) {
 }
 
 // StakeAmount stakes the specified amount for the given delegate
-func StakeAmount(delegate string, amount uint64) error {
+func StakeAmount(delegate, amount string) error {
 	delegateAddr := std.Address(delegate)
-	amountUint := u256.NewUint(amount)
+	amountUint, err := u256.FromDecimal(amount)
+	if err != nil {
+		panic(err)
+	}
 
 	caller := std.GetOrigCaller()
 
@@ -56,7 +59,7 @@ func StakeAmount(delegate string, amount uint64) error {
 	}
 
 	// Transfer tokens from caller to this contract
-	err := gStaker.token.TransferFrom(caller, std.GetOrigPkgAddr(), amount)
+	err = gStaker.token.TransferFrom(caller, std.GetOrigPkgAddr(), amountUint.Uint64())
 	if err != nil {
 		panic(err)
 	}
@@ -80,10 +83,14 @@ func StakeAmount(delegate string, amount uint64) error {
 }
 
 // WithdrawAmount withdraws the specified amount from the given delegate to the recipient
-func WithdrawAmount(delegate, recipient string, amount uint64) error {
+func WithdrawAmount(delegate, recipient, amount string) error {
 	delegateAddr := std.Address(delegate)
     recipientAddr := std.Address(recipient)
-    amountUint := u256.NewUint(amount)
+
+    amountUint, err := u256.FromDecimal(amount)
+	if err != nil {
+		panic(err)
+	}
 
 	caller := std.GetOrigCaller()
 
@@ -109,7 +116,7 @@ func WithdrawAmount(delegate, recipient string, amount uint64) error {
 	gStaker.totalStaked = u256.Zero().Sub(gStaker.totalStaked, amountUint)
 
 	// transfer tokens from this contract to recipient
-	err := gStaker.token.Transfer(recipientAddr, amount)
+	err = gStaker.token.Transfer(recipientAddr, amountUint.Uint64())
 	if err != nil {
 		panic(err)
 	}
@@ -124,7 +131,7 @@ func WithdrawAmount(delegate, recipient string, amount uint64) error {
 }
 
 // GetDelegatedCumulative gets the cumulative delegated amount * seconds for an address at a certain timestamp.
-func GetDelegatedCumulative(delegate string, timestamp uint64) (*u256.Uint, error) {
+func GetDelegatedCumulative(delegate string, timestamp uint64) (string, error) {
 	delegateAddr := std.Address(delegate)
 
 	if timestamp > uint64(time.Now().Unix()) {
@@ -133,7 +140,7 @@ func GetDelegatedCumulative(delegate string, timestamp uint64) (*u256.Uint, erro
 
 	history, exists := gStaker.delegationHistory[delegateAddr]
 	if !exists || len(history) == 0 {
-		return u256.Zero(), nil
+		return u256.Zero().ToString(), nil
 	}
 
 	var lastSnapshot DelegationHistory
@@ -155,12 +162,13 @@ func GetDelegatedCumulative(delegate string, timestamp uint64) (*u256.Uint, erro
 		cumulativeAmount.Add(&cumulativeAmount, u256.Zero().Mul(lastSnapshot.amount, u256.NewUint(duration)))
 	}
 
-	return &cumulativeAmount, nil
+	return cumulativeAmount.ToString(), nil
 }
 
 // GetAverageDelegated calculates the average delegated amount for a delegate over a given period
-func GetAverageDelegated(delegate string, start, end uint64) (*u256.Uint, error) {
+func GetAverageDelegated(delegate string, start, end uint64) (string, error) {
 	delegateAddr := std.Address(delegate)
+	res := u256.Zero()
 
 	if start > end {
 		panic(ErrInvalidTimeRange)
@@ -168,15 +176,16 @@ func GetAverageDelegated(delegate string, start, end uint64) (*u256.Uint, error)
 
 	history, exists := gStaker.delegationHistory[delegateAddr]
 	if !exists || len(history) == 0 {
-		return u256.Zero(), nil
+		return res.ToString(), nil
 	}
 
 	if start >= history[len(history)-1].timestamp {
-		return history[len(history)-1].amount.Clone(), nil
+		res = history[len(history)-1].amount.Clone()
+		return res.ToString(), nil
 	}
 
 	if end <= history[0].timestamp {
-		return u256.Zero(), nil
+		return res.ToString(), nil
 	}
 
 	var (
@@ -212,44 +221,50 @@ func GetAverageDelegated(delegate string, start, end uint64) (*u256.Uint, error)
 
 	totalDuration := end - start
 	if totalDuration == 0 {
-		return lastAmount.Clone(), nil
+		res = lastAmount.Clone()
+		return res.ToString(), nil
 	}
 
-	return u256.Zero().Div(&totalAmount, u256.NewUint(totalDuration)), nil
+	res = u256.Zero().Div(&totalAmount, u256.NewUint(totalDuration))
+	return res.ToString(), nil
 }
 
 // GetAverageDelegatedOverLast gets the average amount delegated over the last period seconds.
-func GetAverageDelegatedOverLast(delegate string, period uint64) (*u256.Uint, error) {
+func GetAverageDelegatedOverLast(delegate string, period uint64) (string, error) {
 	now := uint64(time.Now().Unix())
 	return GetAverageDelegated(delegate, now-period, now)
 }
 
 // GetCurrentDelegated returns the current delegated amount for a delegate
-func GetCurrentDelegated(delegate string) (*u256.Uint, error) {
+func GetCurrentDelegated(delegate string) (string, error) {
+	res := u256.Zero()
 	history, exists := gStaker.delegationHistory[std.Address(delegate)]
 	if !exists || len(history) == 0 {
-		return u256.Zero(), nil
+		return res.ToString(), nil
 	}
 
 	lastEntry := history[len(history)-1]
-	return lastEntry.amount.Clone(), nil
+	res = lastEntry.amount.Clone()
+	return res.ToString(), nil
 }
 
-func GetDelegatedAt(delegate string, timestamp uint64) (*u256.Uint, error) {
+func GetDelegatedAt(delegate string, timestamp uint64) (string, error) {
+	res := u256.Zero()
 	delegateAddr := std.Address(delegate)
 
 	history, exists := gStaker.delegationHistory[delegateAddr]
 	if !exists || len(history) == 0 {
-		return u256.Zero(), nil
+		return res.ToString(), nil
 	}
 
 	for i := len(history) - 1; i >= 0; i-- {
 		if history[i].timestamp <= timestamp {
-			return history[i].amount.Clone(), nil
+			res = history[i].amount.Clone()
+			return res.ToString(), nil
 		}
 	}
 
-	return u256.Zero(), nil
+	return res.ToString(), nil
 }
 
 func maxUint64(a, b uint64) uint64 {

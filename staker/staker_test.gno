@@ -94,13 +94,11 @@ func TestStakeAmount(t *testing.T) {
 	delegateAddr := testutils.TestAddress("delegate")
 	delegate := delegateAddr.String()
 
-	amount := uint64(100)
-
 	// Set up some balance for the caller
 	caller := std.GetOrigCaller()
 	token.balances[caller] = 1000
 
-	err := StakeAmount(delegate, amount)
+	err := StakeAmount(delegate, "100")
 	if err != nil {
 		t.Errorf("StakeAmount returned an unexpected error: %v", err)
 	}
@@ -128,18 +126,17 @@ func TestWithdrawAmount(t *testing.T) {
 	recipientAddr := testutils.TestAddress("recipient")
 	recipient := recipientAddr.String()
 
-	stakeAmount := uint64(100)
 	withdrawAmount := u256.NewUint(50)
 
 	// First, stake some amount
 	token.balances[caller] = 1000
-	err := StakeAmount(delegate, stakeAmount)
+	err := StakeAmount(delegate, "100")
 	if err != nil {
 		t.Fatalf("Failed to stake initial amount: %v", err)
 	}
 
 	// now, try to withdraw
-	err = WithdrawAmount(delegate, recipient, 50)
+	err = WithdrawAmount(delegate, recipient, "50")
 	if err != nil {
 		t.Errorf("WithdrawAmount returned an unexpected error: %v", err)
 	}
@@ -166,10 +163,10 @@ func TestGetAverageDelegated(t *testing.T) {
 	token := newMockGRC20("Test Token", "TST", 42)
 	Init(token)
 
-	delegateAddr := std.Address("delegate")
+	delegateAddr := testutils.TestAddress("delegate")
 	delegate := delegateAddr.String()
 
-	err := StakeAmount(delegate, uint64(0))
+	err := StakeAmount(delegate, "0")
 	if err != nil {
 		t.Fatalf("Failed to stake initial amount: %v", err)
 	}
@@ -186,37 +183,37 @@ func TestGetAverageDelegated(t *testing.T) {
 		name           string
 		start          uint64
 		end            uint64
-		expectedResult *u256.Uint
+		expectedResult string
 	}{
 		{
 			name:           "Full period average",
 			start:          currentTime,
 			end:            currentTime + 200,
-			expectedResult: u256.NewUint(1250), // (1000*100 + 1500*100 + 2000*0) / 200
+			expectedResult: "1250", // (1000*100 + 1500*100 + 2000*0) / 200
 		},
 		{
 			name:           "Partial period average",
 			start:          currentTime + 50,
 			end:            currentTime + 150,
-			expectedResult: u256.NewUint(1250), // (1000*50 + 1500*50) / 100
+			expectedResult: "1250", // (1000*50 + 1500*50) / 100
 		},
 		{
 			name:           "Single point in time",
 			start:          currentTime + 100,
 			end:            currentTime + 100,
-			expectedResult: u256.NewUint(1500),
+			expectedResult: "1500",
 		},
 		{
 			name:           "Period before any stakes",
 			start:          currentTime - 100,
 			end:            currentTime - 50,
-			expectedResult: u256.NewUint(0),
+			expectedResult: "0",
 		},
 		{
 			name:           "Period after all recorded stakes",
 			start:          currentTime + 300,
 			end:            currentTime + 400,
-			expectedResult: u256.NewUint(2000),
+			expectedResult: "2000",
 		},
 	}
 
@@ -226,8 +223,8 @@ func TestGetAverageDelegated(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			if result.Cmp(tt.expectedResult) != 0 {
-				t.Errorf("Expected %s, got %s", tt.expectedResult.ToString(), result.ToString())
+			if result != tt.expectedResult {
+				t.Errorf("Expected %s, got %s", tt.expectedResult, result)
 			}
 		})
 	}
@@ -240,7 +237,7 @@ func TestGetAverageDelegatedOverLast(t *testing.T) {
 	delegateAddr := testutils.TestAddress("delegate")
 	delegate := delegateAddr.String()
 
-	err := StakeAmount(delegate, uint64(0))
+	err := StakeAmount(delegate, "0")
 	if err != nil {
 		t.Fatalf("Failed to stake initial amount: %v", err)
 	}
@@ -258,9 +255,8 @@ func TestGetAverageDelegatedOverLast(t *testing.T) {
 		t.Fatalf("GetAverageDelegatedOverLast failed: %v", err)
 	}
 
-	expected := u256.NewUint(1500) // (1000*50 + 2000*50) / 100
-	if avg.Cmp(expected) != 0 {
-		t.Errorf("Incorrect average delegated over last. Expected %v, got %v", expected, avg)
+	if avg != "1500" { // (1000*50 + 2000*50) / 100
+		t.Errorf("Expected 1500, got %s", avg)
 	}
 }
 
@@ -281,17 +277,17 @@ func TestGetCurrentDelegated(t *testing.T) {
 	tests := []struct {
 		name           string
 		delegate       string
-		expectedResult *u256.Uint
+		expectedResult string
 	}{
 		{
 			name:           "Delegate with history",
 			delegate:       delegate1.String(),
-			expectedResult: u256.NewUint(2000),
+			expectedResult: "2000",
 		},
 		{
 			name:           "Delegate without history",
 			delegate:       delegate2.String(),
-			expectedResult: u256.NewUint(0),
+			expectedResult: "0",
 		},
 	}
 
@@ -301,8 +297,8 @@ func TestGetCurrentDelegated(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			if result.Cmp(tt.expectedResult) != 0 {
-				t.Errorf("Expected %s, got %s", tt.expectedResult.ToString(), result.ToString())
+			if result != tt.expectedResult {
+				t.Errorf("Expected %s, got %s", tt.expectedResult, result)
 			}
 		})
 	}
@@ -324,37 +320,37 @@ func TestGetDelegatedAt(t *testing.T) {
 	tests := []struct {
 		name           string
 		timestamp      uint64
-		expectedResult *u256.Uint
+		expectedResult string
 	}{
 		{
 			name:           "Before first delegation",
 			timestamp:      50,
-			expectedResult: u256.NewUint(0),
+			expectedResult: "0",
 		},
 		{
 			name:           "At first delegation",
 			timestamp:      100,
-			expectedResult: u256.NewUint(1000),
+			expectedResult: "1000",
 		},
 		{
 			name:           "Between first and second delegation",
 			timestamp:      150,
-			expectedResult: u256.NewUint(1000),
+			expectedResult: "1000",
 		},
 		{
 			name:           "At second delegation",
 			timestamp:      200,
-			expectedResult: u256.NewUint(1500),
+			expectedResult: "1500",
 		},
 		{
 			name:           "At last delegation",
 			timestamp:      300,
-			expectedResult: u256.NewUint(2000),
+			expectedResult: "2000",
 		},
 		{
 			name:           "After last delegation",
 			timestamp:      400,
-			expectedResult: u256.NewUint(2000),
+			expectedResult: "2000",
 		},
 	}
 
@@ -364,8 +360,8 @@ func TestGetDelegatedAt(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			if result.Cmp(tt.expectedResult) != 0 {
-				t.Errorf("Expected %s, got %s", tt.expectedResult.ToString(), result.ToString())
+			if result != tt.expectedResult {
+				t.Errorf("Expected %s, got %s", tt.expectedResult, result)
 			}
 		})
 	}
@@ -375,8 +371,8 @@ func TestGetDelegatedAt(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
-		if !result.IsZero() {
-			t.Errorf("Expected 0, got %s", result.ToString())
+		if result != "0" {
+			t.Errorf("Expected 0, got %s", result)
 		}
 	})
 }
