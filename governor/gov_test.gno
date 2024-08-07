@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"std"
+	"strings"
 	"testing"
 	"time"
 
+	"gno.land/p/demo/testutils"
 	"gno.land/p/demo/ufmt"
 	"gno.land/p/demo/uint256"
 )
@@ -63,8 +65,11 @@ func TestPropose(t *testing.T) {
 
 	t.Run("Successful proposal", func(t *testing.T) {
 		Init(mockStaker, config)
-		toAddr := std.Address("test_address").String()
-		callsJSON := ufmt.Sprintf(`[{"to":"%s","selector":1,"calldata":"test_data"}]`, toAddr)
+		toAddr := testutils.TestAddress("test_address").String()
+		callsJSON := ufmt.Sprintf(
+			`[{"to":"%s","selector":1,"calldata":"test_data"}]`,
+			toAddr,
+		)
 
 		id, err := Propose(callsJSON)
 		if err != nil {
@@ -92,7 +97,10 @@ func TestPropose(t *testing.T) {
 	t.Run("Proposal with insufficient stake", func(t *testing.T) {
 		Init(mockStaker, config)
 		mockStaker.averageDelegated = uint256.NewUint(50) // Below threshold
-		callsJSON := ufmt.Sprintf(`[{"to":"%s","selector":1,"calldata":"test_data"}]`, std.Address("test_address").String())
+		callsJSON := ufmt.Sprintf(
+			`[{"to":"%s","selector":1,"calldata":"test_data"}]`,
+			testutils.TestAddress("test_address").String(),
+		)
 
 		defer func() {
 			if r := recover(); r == nil {
@@ -126,429 +134,420 @@ func TestPropose(t *testing.T) {
 	})
 }
 
-// func TestDescribe(t *testing.T) {
-// 	mockStaker := &MockStaker{
-// 		averageDelegated: uint256.NewUint(1000),
-// 	}
-
-// 	config := Config{
-// 		VotingStartDelay:              100,
-// 		VotingPeriod:                  1000,
-// 		VotingWeightSmoothingDuration: 100,
-// 		Quorum:                        uint256.NewUint(500),
-// 		ProposalCreationThreshold:     uint256.NewUint(100),
-// 		ExecutionDelay:                100,
-// 		ExecutionWindow:               1000,
-// 	}
-
-// 	Init(mockStaker, config)
-
-// 	calls := []Call{
-// 		{
-// 			To:       std.Address("test_address"),
-// 			Selector: 1,
-// 			Calldata: []byte("test_data"),
-// 		},
-// 	}
-
-// 	id, _ := Propose(calls)
-
-// 	t.Run("Non-existent proposal", func(t *testing.T) {
-// 		Init(mockStaker, config)
-// 		nonExistentID := [32]byte{}
-// 		defer func() {
-// 			if r := recover(); r != nil {
-// 				var errMsg string
-// 				switch v := r.(type) {
-// 				case string:
-// 					errMsg = v
-// 				case error:
-// 					errMsg = v.Error()
-// 				default:
-// 					errMsg = ufmt.Sprintf("unexpected panic: %v", r)
-// 				}
-// 				expectedErrMsg := "DOES_NOT_EXIST"
-// 				if !bytes.Contains([]byte(errMsg), []byte(expectedErrMsg)) {
-// 					t.Fatalf("unexpected panic message: %v", errMsg)
-// 				}
-// 			} else {
-// 				t.Fatalf("should panic")
-// 			}
-// 		}()
-
-// 		Describe(nonExistentID, "Test description")
-// 	})
-
-// 	t.Run("Already executed proposal", func(t *testing.T) {
-// 		proposal := gGovernor.proposals[id]
-// 		proposal.ExecutionState.Executed = uint64(time.Now().Unix())
-// 		gGovernor.proposals[id] = proposal
-
-// 		defer func() {
-// 			if r := recover(); r != nil {
-// 				var errMsg string
-// 				switch v := r.(type) {
-// 				case string:
-// 					errMsg = v
-// 				case error:
-// 					errMsg = v.Error()
-// 				default:
-// 					errMsg = ufmt.Sprintf("unexpected panic: %v", r)
-// 				}
-// 				expectedErrMsg := "ALREADY_EXECUTED"
-// 				if !bytes.Contains([]byte(errMsg), []byte(expectedErrMsg)) {
-// 					t.Fatalf("unexpected panic message: %v", errMsg)
-// 				}
-// 			} else {
-// 				t.Fatalf("should panic")
-// 			}
-// 		}()
-
-// 		Describe(id, "Test description")
-// 		// expect panic message: panic: already executed
-// 	})
-
-// 	t.Run("Canceled proposal", func(t *testing.T) {
-// 		proposal := gGovernor.proposals[id]
-// 		proposal.ExecutionState.Executed = 0
-// 		proposal.ExecutionState.Canceled = uint64(time.Now().Unix())
-// 		gGovernor.proposals[id] = proposal
-
-// 		defer func() {
-// 			if r := recover(); r != nil {
-// 				var errMsg string
-// 				switch v := r.(type) {
-// 				case string:
-// 					errMsg = v
-// 				case error:
-// 					errMsg = v.Error()
-// 				default:
-// 					errMsg = ufmt.Sprintf("unexpected panic: %v", r)
-// 				}
-// 				expectedErrMsg := "PROPOSAL_CANCELED"
-// 				if !bytes.Contains([]byte(errMsg), []byte(expectedErrMsg)) {
-// 					t.Fatalf("unexpected panic message: %v", errMsg)
-// 				}
-// 			} else {
-// 				t.Fatalf("should panic")
-// 			}
-// 		}()
-
-// 		Describe(id, "Test description")
-// 	})
-// }
-
-// func TestProposeAndDescribe(t *testing.T) {
-// 	mockStaker := &MockStaker{
-// 		averageDelegated: uint256.NewUint(1000),
-// 	}
-
-// 	config := Config{
-// 		VotingStartDelay:              100,
-// 		VotingPeriod:                  1000,
-// 		VotingWeightSmoothingDuration: 100,
-// 		Quorum:                        uint256.NewUint(500),
-// 		ProposalCreationThreshold:     uint256.NewUint(100),
-// 		ExecutionDelay:                100,
-// 		ExecutionWindow:               1000,
-// 	}
-
-// 	Init(mockStaker, config)
-
-// 	calls := []Call{
-// 		{
-// 			To:       std.Address("test_address"),
-// 			Selector: 1,
-// 			Calldata: []byte("test_data"),
-// 		},
-// 	}
-
-// 	description := "Test proposal description"
-
-// 	t.Run("Successful propose and describe", func(t *testing.T) {
-// 		id, err := ProposeAndDescribe(calls, description)
-// 		if err != nil {
-// 			t.Fatalf("ProposeAndDescribe failed: %v", err)
-// 		}
-
-// 		proposal, exists := gGovernor.proposals[id]
-// 		if !exists {
-// 			t.Fatalf("Proposal not found after creation")
-// 		}
-
-// 		if proposal.Proposer != std.GetOrigCaller() {
-// 			t.Errorf("Incorrect proposer. Expected %v, got %v", std.GetOrigCaller(), proposal.Proposer)
-// 		}
-
-// 		if proposal.ExecutionState.Created == 0 {
-// 			t.Errorf("Proposal creation time not set")
-// 		}
-// 	})
-
-// 	t.Run("Proposal with insufficient stake", func(t *testing.T) {
-// 		mockStaker.averageDelegated = uint256.NewUint(50) // Below threshold
-
-// 		defer func() {
-// 			if r := recover(); r != nil {
-// 				var errMsg string
-// 				switch v := r.(type) {
-// 				case string:
-// 					errMsg = v
-// 				case error:
-// 					errMsg = v.Error()
-// 				default:
-// 					errMsg = ufmt.Sprintf("unexpected panic: %v", r)
-// 				}
-// 				// XXX
-// 				expectedErrMsg := "PROPOSER_HAS_ACTIVE_PROPOSAL"
-// 				if !bytes.Contains([]byte(errMsg), []byte(expectedErrMsg)) {
-// 					t.Fatalf("unexpected panic message: %v", errMsg)
-// 				}
-// 			} else {
-// 				t.Fatalf("should panic")
-// 			}
-// 		}()
-
-// 		ProposeAndDescribe(calls, description)
-// 	})
-// }
-
-// func TestVote(t *testing.T) {
-// 	mockStaker := &MockStaker{
-// 		averageDelegated: uint256.NewUint(1000),
-// 	}
-
-// 	config := Config{
-// 		VotingStartDelay:              100,
-// 		VotingPeriod:                  1000,
-// 		VotingWeightSmoothingDuration: 100,
-// 		Quorum:                        uint256.NewUint(500),
-// 		ProposalCreationThreshold:     uint256.NewUint(100),
-// 		ExecutionDelay:                100,
-// 		ExecutionWindow:               1000,
-// 	}
-
-// 	Init(mockStaker, config)
-
-// 	calls := []Call{
-// 		{
-// 			To:       std.Address("test_address"),
-// 			Selector: 1,
-// 			Calldata: []byte("test_data"),
-// 		},
-// 	}
-
-// 	id, _ := Propose(calls)
-
-// 	t.Run("Successful vote", func(t *testing.T) {
-// 		// Set the current time to be within the voting period
-// 		currentTime := gGovernor.proposals[id].ExecutionState.Created + config.VotingStartDelay + 50
-// 		origTimeNow := timeNow
-// 		timeNow = func() time.Time { return time.Unix(int64(currentTime), 0) }
-// 		defer func() { timeNow = origTimeNow }()
-
-// 		Vote(id, true)
-
-// 		proposal := gGovernor.proposals[id]
-// 		if proposal.Yea.Cmp(uint256.NewUint(1000)) != 0 {
-// 			t.Errorf("Expected Yea votes to be 1000, got %s", proposal.Yea.ToString())
-// 		}
-
-// 		vote := gGovernor.vote[id][std.GetOrigCaller()]
-// 		if vote != 3 {
-// 			t.Errorf("Expected vote to be 3 (Yea), got %d", vote)
-// 		}
-// 	})
-
-// 	t.Run("Vote before voting period", func(t *testing.T) {
-// 		currentTime := gGovernor.proposals[id].ExecutionState.Created + config.VotingStartDelay - 1
-// 		origTimeNow := timeNow
-// 		timeNow = func() time.Time { return time.Unix(int64(currentTime), 0) }
-// 		defer func() { timeNow = origTimeNow }()
-
-// 		defer func() {
-// 			if r := recover(); r == nil {
-// 				t.Errorf("The code did not panic")
-// 			} else if r != "VOTING_NOT_STARTED" {
-// 				t.Errorf("Unexpected panic: %v", r)
-// 			}
-// 		}()
-
-// 		Vote(id, true)
-// 	})
-
-// 	t.Run("Vote after voting period", func(t *testing.T) {
-// 		currentTime := gGovernor.proposals[id].ExecutionState.Created + config.VotingStartDelay + config.VotingPeriod + 1
-// 		origTimeNow := timeNow
-// 		timeNow = func() time.Time { return time.Unix(int64(currentTime), 0) }
-// 		defer func() { timeNow = origTimeNow }()
-
-// 		defer func() {
-// 			if r := recover(); r == nil {
-// 				t.Errorf("The code did not panic")
-// 			} else if r != "VOTING_ENDED" {
-// 				t.Errorf("Unexpected panic: %v", r)
-// 			}
-// 		}()
-
-// 		Vote(id, true)
-// 	})
-
-// 	// TODO: panic well. but test doesn't pass.
-// 	t.Run("Vote twice", func(t *testing.T) {
-// 		t.Skip()
-// 		currentTime := gGovernor.proposals[id].ExecutionState.Created + config.VotingStartDelay + 50
-// 		origTimeNow := timeNow
-// 		timeNow = func() time.Time { return time.Unix(int64(currentTime), 0) }
-// 		defer func() { timeNow = origTimeNow }()
-
-// 		Vote(id, true)
-
-// 		panicked := false
-// 		panicValue := ""
-// 		func() {
-// 			defer func() {
-// 				if r := recover(); r != nil {
-// 					panicked = true
-// 					panicValue = ufmt.Sprintf("%v", r)
-// 				}
-// 			}()
-// 			Vote(id, false)
-// 		}()
-
-// 		if !panicked {
-// 			t.Errorf("The code did not panic")
-// 		} else if panicValue != "ALREADY_VOTED" {
-// 			t.Errorf("Unexpected panic: %v", panicValue)
-// 		}
-// 	})
-// }
-
-// func TestCancel(t *testing.T) {
-// 	mockStaker := &MockStaker{
-// 		averageDelegated: uint256.NewUint(1000),
-// 	}
-
-// 	config := Config{
-// 		VotingStartDelay:              100,
-// 		VotingPeriod:                  1000,
-// 		VotingWeightSmoothingDuration: 100,
-// 		Quorum:                        uint256.NewUint(500),
-// 		ProposalCreationThreshold:     uint256.NewUint(100),
-// 		ExecutionDelay:                100,
-// 		ExecutionWindow:               1000,
-// 	}
-
-// 	Init(mockStaker, config)
-
-// 	calls := []Call{
-// 		{
-// 			To:       std.Address("test_address"),
-// 			Selector: 1,
-// 			Calldata: []byte("test_data"),
-// 		},
-// 	}
-
-// 	id, _ := Propose(calls)
-
-// 	t.Run("Successful cancel by proposer", func(t *testing.T) {
-// 		Cancel(id)
-
-// 		proposal := gGovernor.proposals[id]
-// 		if proposal.ExecutionState.Canceled == 0 {
-// 			t.Errorf("Proposal was not canceled")
-// 		}
-// 	})
-
-// 	t.Run("Cancel already canceled proposal", func(t *testing.T) {
-// 		defer func() {
-// 			if r := recover(); r == nil {
-// 				t.Errorf("The code did not panic")
-// 			} else if r != "ALREADY_CANCELED" {
-// 				t.Errorf("Unexpected panic: %v", r)
-// 			}
-// 		}()
-
-// 		Cancel(id)
-// 	})
-
-// 	t.Run("Cancel after voting started", func(t *testing.T) {
-// 		id, _ := Propose(calls)
-
-// 		// Set the current time to be after voting start
-// 		currentTime := gGovernor.proposals[id].ExecutionState.Created + config.VotingStartDelay + 1
-// 		origTimeNow := timeNow
-// 		timeNow = func() time.Time { return time.Unix(int64(currentTime), 0) }
-// 		defer func() { timeNow = origTimeNow }()
-
-// 		defer func() {
-// 			if r := recover(); r == nil {
-// 				t.Errorf("The code did not panic")
-// 			} else if r != "VOTING_STARTED" {
-// 				t.Errorf("Unexpected panic: %v", r)
-// 			}
-// 		}()
-
-// 		Cancel(id)
-// 	})
-// }
-
-// func TestGetConfigVersion(t *testing.T) {
-// 	mockStaker := &MockStaker{
-// 		averageDelegated: uint256.NewUint(1000),
-// 	}
-
-// 	initialConfig := Config{
-// 		VotingStartDelay:              100,
-// 		VotingPeriod:                  1000,
-// 		VotingWeightSmoothingDuration: 100,
-// 		Quorum:                        uint256.NewUint(500),
-// 		ProposalCreationThreshold:     uint256.NewUint(100),
-// 		ExecutionDelay:                100,
-// 		ExecutionWindow:               1000,
-// 	}
-
-// 	Init(mockStaker, initialConfig)
-
-// 	t.Run("Get initial config (version 0)", func(t *testing.T) {
-// 		config := GetConfigVersion(0)
-// 		if config != initialConfig {
-// 			t.Errorf("Expected initial config, got different config")
-// 		}
-// 	})
-
-// 	t.Run("Get non-existent config version", func(t *testing.T) {
-// 		defer func() {
-// 			if r := recover(); r == nil {
-// 				t.Errorf("The code did not panic")
-// 			} else if r != "DOES_NOT_EXIST" {
-// 				t.Errorf("Unexpected panic: %v", r)
-// 			}
-// 		}()
-
-// 		GetConfigVersion(1) // This should panic
-// 	})
-
-// 	t.Run("Get existing config version", func(t *testing.T) {
-// 		newConfig := Config{
-// 			VotingStartDelay:              200,
-// 			VotingPeriod:                  2000,
-// 			VotingWeightSmoothingDuration: 200,
-// 			Quorum:                        uint256.NewUint(1000),
-// 			ProposalCreationThreshold:     uint256.NewUint(200),
-// 			ExecutionDelay:                200,
-// 			ExecutionWindow:               2000,
-// 		}
-
-// 		gGovernor.configVersions[1] = newConfig
-// 		gGovernor.latestConfigVersion = 1
-
-// 		config := GetConfigVersion(1)
-// 		if config != newConfig {
-// 			t.Errorf("Expected new config, got different config")
-// 		}
-// 	})
-// }
+func TestDescribe(t *testing.T) {
+	mockStaker := &MockStaker{
+		averageDelegated: uint256.NewUint(1000),
+	}
+
+	config := Config{
+		VotingStartDelay:              100,
+		VotingPeriod:                  1000,
+		VotingWeightSmoothingDuration: 100,
+		Quorum:                        uint256.NewUint(500),
+		ProposalCreationThreshold:     uint256.NewUint(100),
+		ExecutionDelay:                100,
+		ExecutionWindow:               1000,
+	}
+
+	Init(mockStaker, config)
+
+	callsJSON := ufmt.Sprintf(
+		`[{"to":"%s","selector":1,"calldata":"test_data"}]`,
+		testutils.TestAddress("test_address").String(),
+	)
+	id, _ := Propose(callsJSON)
+
+	t.Run("Non-existent proposal", func(t *testing.T) {
+		Init(mockStaker, config)
+		nonExistentID := "0000000000000000000000000000000000000000000000000000000000000000"
+		defer func() {
+			if r := recover(); r != nil {
+				var errMsg string
+				switch v := r.(type) {
+				case string:
+					errMsg = v
+				case error:
+					errMsg = v.Error()
+				default:
+					errMsg = ufmt.Sprintf("unexpected panic: %v", r)
+				}
+				expectedErrMsg := "DOES_NOT_EXIST"
+				if !bytes.Contains([]byte(errMsg), []byte(expectedErrMsg)) {
+					t.Fatalf("unexpected panic message: %v", errMsg)
+				}
+			} else {
+				t.Fatalf("should panic")
+			}
+		}()
+
+		Describe(string(nonExistentID), "Test description")
+	})
+
+	t.Run("Already executed proposal", func(t *testing.T) {
+		proposal := gGovernor.proposals[id]
+		proposal.ExecutionState.Executed = uint64(time.Now().Unix())
+		gGovernor.proposals[id] = proposal
+
+		defer func() {
+			if r := recover(); r != nil {
+				var errMsg string
+				switch v := r.(type) {
+				case string:
+					errMsg = v
+				case error:
+					errMsg = v.Error()
+				default:
+					errMsg = ufmt.Sprintf("unexpected panic: %v", r)
+				}
+				expectedErrMsg := "ALREADY_EXECUTED"
+				if !bytes.Contains([]byte(errMsg), []byte(expectedErrMsg)) {
+					t.Fatalf("unexpected panic message: %v", errMsg)
+				}
+			} else {
+				t.Fatalf("should panic")
+			}
+		}()
+
+		Describe(id, "Test description")
+		// expect panic message: panic: already executed
+	})
+
+	t.Run("Canceled proposal", func(t *testing.T) {
+		proposal := gGovernor.proposals[id]
+		proposal.ExecutionState.Executed = 0
+		proposal.ExecutionState.Canceled = uint64(time.Now().Unix())
+		gGovernor.proposals[id] = proposal
+
+		defer func() {
+			if r := recover(); r != nil {
+				var errMsg string
+				switch v := r.(type) {
+				case string:
+					errMsg = v
+				case error:
+					errMsg = v.Error()
+				default:
+					errMsg = ufmt.Sprintf("unexpected panic: %v", r)
+				}
+				expectedErrMsg := "PROPOSAL_CANCELED"
+				if !bytes.Contains([]byte(errMsg), []byte(expectedErrMsg)) {
+					t.Fatalf("unexpected panic message: %v", errMsg)
+				}
+			} else {
+				t.Fatalf("should panic")
+			}
+		}()
+
+		Describe(id, "Test description")
+	})
+}
+
+func TestProposeAndDescribe(t *testing.T) {
+	mockStaker := &MockStaker{
+		averageDelegated: uint256.NewUint(1000),
+	}
+
+	config := Config{
+		VotingStartDelay:              100,
+		VotingPeriod:                  1000,
+		VotingWeightSmoothingDuration: 100,
+		Quorum:                        uint256.NewUint(500),
+		ProposalCreationThreshold:     uint256.NewUint(100),
+		ExecutionDelay:                100,
+		ExecutionWindow:               1000,
+	}
+
+	Init(mockStaker, config)
+
+	callsJSON := ufmt.Sprintf(
+		`[{"to":"%s","selector":1,"calldata":"test_data"}]`,
+		std.Address("test_address").String(),
+	)
+
+	description := "Test proposal description"
+
+	t.Run("Successful propose and describe", func(t *testing.T) {
+		id, err := ProposeAndDescribe(callsJSON, description)
+		if err != nil {
+			t.Fatalf("ProposeAndDescribe failed: %v", err)
+		}
+
+		proposal, exists := gGovernor.proposals[id]
+		if !exists {
+			t.Fatalf("Proposal not found after creation")
+		}
+
+		if proposal.Proposer != std.GetOrigCaller() {
+			t.Errorf("Incorrect proposer. Expected %v, got %v", std.GetOrigCaller(), proposal.Proposer)
+		}
+
+		if proposal.ExecutionState.Created == 0 {
+			t.Errorf("Proposal creation time not set")
+		}
+	})
+
+	t.Run("Proposal with insufficient stake", func(t *testing.T) {
+		mockStaker.averageDelegated = uint256.NewUint(50) // Below threshold
+
+		defer func() {
+			if r := recover(); r != nil {
+				var errMsg string
+				switch v := r.(type) {
+				case string:
+					errMsg = v
+				case error:
+					errMsg = v.Error()
+				default:
+					errMsg = ufmt.Sprintf("unexpected panic: %v", r)
+				}
+				expectedErrMsg := "PROPOSER_HAS_ACTIVE_PROPOSAL"
+				if !bytes.Contains([]byte(errMsg), []byte(expectedErrMsg)) {
+					t.Fatalf("unexpected panic message: %v", errMsg)
+				}
+			} else {
+				t.Fatalf("should panic")
+			}
+		}()
+
+		ProposeAndDescribe(callsJSON, description)
+	})
+}
+
+func TestVote(t *testing.T) {
+	mockStaker := &MockStaker{
+		averageDelegated: uint256.NewUint(1000),
+	}
+
+	config := Config{
+		VotingStartDelay:              100,
+		VotingPeriod:                  1000,
+		VotingWeightSmoothingDuration: 100,
+		Quorum:                        uint256.NewUint(500),
+		ProposalCreationThreshold:     uint256.NewUint(100),
+		ExecutionDelay:                100,
+		ExecutionWindow:               1000,
+	}
+
+	Init(mockStaker, config)
+
+	callsJSON := ufmt.Sprintf(
+		`[{"to":"%s","selector":1,"calldata":"test_data"}]`,
+		testutils.TestAddress("test_address").String(),
+	)
+
+	id, _ := Propose(callsJSON)
+
+	t.Run("Successful vote", func(t *testing.T) {
+		// Set the current time to be within the voting period
+		currentTime := gGovernor.proposals[id].ExecutionState.Created + config.VotingStartDelay + 50
+		origTimeNow := timeNow
+		timeNow = func() time.Time { return time.Unix(int64(currentTime), 0) }
+		defer func() { timeNow = origTimeNow }()
+
+		Vote(id, true)
+
+		proposal := gGovernor.proposals[id]
+		if proposal.Yea.Cmp(uint256.NewUint(1000)) != 0 {
+			t.Errorf("Expected Yea votes to be 1000, got %s", proposal.Yea.ToString())
+		}
+
+		vote := gGovernor.vote[id][std.GetOrigCaller()]
+		if vote != 3 {
+			t.Errorf("Expected vote to be 3 (Yea), got %d", vote)
+		}
+	})
+
+	t.Run("Vote before voting period", func(t *testing.T) {
+		currentTime := gGovernor.proposals[id].ExecutionState.Created + config.VotingStartDelay - 1
+		origTimeNow := timeNow
+		timeNow = func() time.Time { return time.Unix(int64(currentTime), 0) }
+		defer func() { timeNow = origTimeNow }()
+
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("The code did not panic")
+			} else if r != "VOTING_NOT_STARTED" {
+				t.Errorf("Unexpected panic: %v", r)
+			}
+		}()
+
+		Vote(id, true)
+	})
+
+	t.Run("Vote after voting period", func(t *testing.T) {
+		currentTime := gGovernor.proposals[id].ExecutionState.Created + config.VotingStartDelay + config.VotingPeriod + 1
+		origTimeNow := timeNow
+		timeNow = func() time.Time { return time.Unix(int64(currentTime), 0) }
+		defer func() { timeNow = origTimeNow }()
+
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("The code did not panic")
+			} else if r != "VOTING_ENDED" {
+				t.Errorf("Unexpected panic: %v", r)
+			}
+		}()
+
+		Vote(id, true)
+	})
+
+	t.Run("Vote twice", func(t *testing.T) {
+		t.Skip()
+		currentTime := gGovernor.proposals[id].ExecutionState.Created + config.VotingStartDelay + 50
+		origTimeNow := timeNow
+		timeNow = func() time.Time { return time.Unix(int64(currentTime), 0) }
+		defer func() { timeNow = origTimeNow }()
+
+		Vote(id, true)
+
+		panicked := false
+		panicValue := ""
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					panicked = true
+					panicValue = ufmt.Sprintf("%v", r)
+				}
+			}()
+			Vote(id, false)
+		}()
+
+		if !panicked {
+			t.Errorf("The code did not panic")
+		} else if panicValue != "ALREADY_VOTED" {
+			t.Errorf("Unexpected panic: %v", panicValue)
+		}
+	})
+}
+
+func TestCancel(t *testing.T) {
+	mockStaker := &MockStaker{
+		averageDelegated: uint256.NewUint(1000),
+	}
+
+	config := Config{
+		VotingStartDelay:              100,
+		VotingPeriod:                  1000,
+		VotingWeightSmoothingDuration: 100,
+		Quorum:                        uint256.NewUint(500),
+		ProposalCreationThreshold:     uint256.NewUint(100),
+		ExecutionDelay:                100,
+		ExecutionWindow:               1000,
+	}
+
+	Init(mockStaker, config)
+
+	callsJSON := ufmt.Sprintf(
+		`[{"to":"%s","selector":1,"calldata":"test_data"}]`,
+		testutils.TestAddress("test_address").String(),
+	)
+
+	id, err := Propose(callsJSON)
+	if err != nil {
+		t.Fatalf("Propose failed: %v", err)
+	}
+
+	t.Run("Successful cancel by proposer", func(t *testing.T) {
+		Cancel(id)
+
+		proposal := gGovernor.proposals[id]
+		if proposal.ExecutionState.Canceled == 0 {
+			t.Errorf("Proposal was not canceled")
+		}
+	})
+
+	t.Run("Cancel already canceled proposal", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("The code did not panic")
+			} else if r != "ALREADY_CANCELED" {
+				t.Errorf("Unexpected panic: %v", r)
+			}
+		}()
+
+		Cancel(id)
+	})
+
+	t.Run("Cancel after voting started", func(t *testing.T) {
+		id, err := Propose(callsJSON)
+		if err != nil {
+			t.Fatalf("Propose failed: %v", err)
+		}
+
+		// Set the current time to be after voting start
+		currentTime := gGovernor.proposals[id].ExecutionState.Created + config.VotingStartDelay + 1
+		origTimeNow := timeNow
+		timeNow = func() time.Time { return time.Unix(int64(currentTime), 0) }
+		defer func() { timeNow = origTimeNow }()
+
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("The code did not panic")
+			} else if r != "VOTING_STARTED" {
+				t.Errorf("Unexpected panic: %v", r)
+			}
+		}()
+
+		Cancel(id)
+	})
+}
+
+func TestGetConfigVersion(t *testing.T) {
+	mockStaker := &MockStaker{
+		averageDelegated: uint256.NewUint(1000),
+	}
+
+	initialConfig := Config{
+		VotingStartDelay:              100,
+		VotingPeriod:                  1000,
+		VotingWeightSmoothingDuration: 100,
+		Quorum:                        uint256.NewUint(500),
+		ProposalCreationThreshold:     uint256.NewUint(100),
+		ExecutionDelay:                100,
+		ExecutionWindow:               1000,
+	}
+
+	Init(mockStaker, initialConfig)
+
+	t.Run("Get initial config (version 0)", func(t *testing.T) {
+		config := GetConfigVersion(0)
+		if config != initialConfig {
+			t.Errorf("Expected initial config, got different config")
+		}
+	})
+
+	t.Run("Get non-existent config version", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("The code did not panic")
+			} else if r != "DOES_NOT_EXIST" {
+				t.Errorf("Unexpected panic: %v", r)
+			}
+		}()
+
+		GetConfigVersion(1) // This should panic
+	})
+
+	t.Run("Get existing config version", func(t *testing.T) {
+		newConfig := Config{
+			VotingStartDelay:              200,
+			VotingPeriod:                  2000,
+			VotingWeightSmoothingDuration: 200,
+			Quorum:                        uint256.NewUint(1000),
+			ProposalCreationThreshold:     uint256.NewUint(200),
+			ExecutionDelay:                200,
+			ExecutionWindow:               2000,
+		}
+
+		gGovernor.configVersions[1] = newConfig
+		gGovernor.latestConfigVersion = 1
+
+		config := GetConfigVersion(1)
+		if config != newConfig {
+			t.Errorf("Expected new config, got different config")
+		}
+	})
+}
 
 // func TestExecuteCall(t *testing.T) {
 // 	tests := []struct {
@@ -636,99 +635,101 @@ func TestPropose(t *testing.T) {
 // 	}
 // }
 
-// func TestExecute(t *testing.T) {
-// 	RegisterFunction(1, func(data []byte) ([]byte, error) {
-// 		return append([]byte("Executed: "), data...), nil
-// 	})
+func TestExecute(t *testing.T) {
+	RegisterFunction(1, func(data []byte) ([]byte, error) {
+		return append([]byte("Executed: "), data...), nil
+	})
 
-// 	setupGovernor := func() ([32]byte, []Call, Config) {
-// 		mockStaker := &MockStaker{
-// 			averageDelegated: uint256.NewUint(1000),
-// 		}
+	setupGovernor := func() (string, string, Config) {
+		mockStaker := &MockStaker{
+			averageDelegated: uint256.NewUint(1000),
+		}
 
-// 		config := Config{
-// 			VotingStartDelay:              100,
-// 			VotingPeriod:                  1000,
-// 			VotingWeightSmoothingDuration: 100,
-// 			Quorum:                        uint256.NewUint(500),
-// 			ProposalCreationThreshold:     uint256.NewUint(100),
-// 			ExecutionDelay:                100,
-// 			ExecutionWindow:               1000,
-// 		}
+		config := Config{
+			VotingStartDelay:              100,
+			VotingPeriod:                  1000,
+			VotingWeightSmoothingDuration: 100,
+			Quorum:                        uint256.NewUint(500),
+			ProposalCreationThreshold:     uint256.NewUint(100),
+			ExecutionDelay:                100,
+			ExecutionWindow:               1000,
+		}
 
-// 		Init(mockStaker, config)
+		Init(mockStaker, config)
 
-// 		calls := []Call{
-// 			{
-// 				To:       std.Address("test_address"),
-// 				Selector: 1,
-// 				Calldata: []byte("test_data"),
-// 			},
-// 		}
+		callsJSON := ufmt.Sprintf(
+			`[{"to":"%s","selector":1,"calldata":"test_data"}]`,
+			testutils.TestAddress("test_address").String(),
+		)
 
-// 		id, _ := Propose(calls)
+		id, _ := Propose(callsJSON)
 
-// 		// Set the time to be after voting has started
-// 		proposal := gGovernor.proposals[id]
-// 		votingStartTime := proposal.ExecutionState.Created + config.VotingStartDelay + 1
-// 		origTimeNow := timeNow
-// 		timeNow = func() time.Time { return time.Unix(int64(votingStartTime), 0) }
+		// Set the time to be after voting has started
+		proposal := gGovernor.proposals[id]
+		votingStartTime := proposal.ExecutionState.Created + config.VotingStartDelay + 1
+		origTimeNow := timeNow
+		timeNow = func() time.Time { return time.Unix(int64(votingStartTime), 0) }
 
-// 		// Set up a successful vote
-// 		Vote(id, true)
+		// Set up a successful vote
+		Vote(id, true)
 
-// 		// Reset the time function
-// 		timeNow = origTimeNow
+		// Reset the time function
+		timeNow = origTimeNow
 
-// 		return id, calls, config
-// 	}
+		return id, callsJSON, config
+	}
 
-// 	t.Run("Successful execution", func(t *testing.T) {
-// 		id, calls, config := setupGovernor()
+	t.Run("Successful execution", func(t *testing.T) {
+		id, callsJSON, config := setupGovernor()
 
-// 		// Set the current time to be within the execution window
-// 		proposal := gGovernor.proposals[id]
-// 		currentTime := proposal.ExecutionState.Created + config.VotingStartDelay + config.VotingPeriod + config.ExecutionDelay + 1
-// 		origTimeNow := timeNow
-// 		timeNow = func() time.Time { return time.Unix(int64(currentTime), 0) }
-// 		defer func() { timeNow = origTimeNow }()
+		// Set the current time to be within the execution window
+		proposal := gGovernor.proposals[id]
+		currentTime := proposal.ExecutionState.Created + config.VotingStartDelay + config.VotingPeriod + config.ExecutionDelay + 1
+		origTimeNow := timeNow
+		timeNow = func() time.Time { return time.Unix(int64(currentTime), 0) }
+		defer func() { timeNow = origTimeNow }()
 
-// 		results := Execute(id, calls)
+		results := Execute(id, callsJSON)
 
-// 		if len(results) != len(calls) {
-// 			t.Errorf("Expected %d results, got %d", len(calls), len(results))
-// 		}
+		// if len(results) != len(calls) {
+		// 	t.Errorf("Expected %d results, got %d", len(calls), len(results))
+		// }
 
-// 		executedProposal := gGovernor.proposals[id]
-// 		if executedProposal.ExecutionState.Executed == 0 {
-// 			t.Errorf("Proposal was not marked as executed")
-// 		}
+		rr := strings.Split(results, ",")
+		if len(rr) != 1 {
+			t.Errorf("Expected 1 result, got %d", len(rr))
+		}
 
-// 		// Check the result of the executed function
-// 		expectedResult := []byte("Executed: test_data")
-// 		if !bytes.Equal(results[0], expectedResult) {
-// 			t.Errorf("Expected result %s, got %s", expectedResult, results[0])
-// 		}
-// 	})
+		executedProposal := gGovernor.proposals[id]
+		if executedProposal.ExecutionState.Executed == 0 {
+			t.Errorf("Proposal was not marked as executed")
+		}
 
-// 	t.Run("Execution before voting ends", func(t *testing.T) {
-// 		id, calls, config := setupGovernor()
+		// Check the result of the executed function
+		expectedResult := "Executed: test_data"
+		if results != expectedResult {
+			t.Errorf("Expected result %s, got %s", expectedResult, results[0])
+		}
+	})
 
-// 		// Set the current time to be before voting ends
-// 		proposal := gGovernor.proposals[id]
-// 		currentTime := proposal.ExecutionState.Created + config.VotingStartDelay + config.VotingPeriod - 1
-// 		origTimeNow := timeNow
-// 		timeNow = func() time.Time { return time.Unix(int64(currentTime), 0) }
-// 		defer func() { timeNow = origTimeNow }()
+	t.Run("Execution before voting ends", func(t *testing.T) {
+		id, calls, config := setupGovernor()
 
-// 		defer func() {
-// 			if r := recover(); r == nil {
-// 				t.Errorf("The code did not panic")
-// 			} else if r != "VOTING_NOT_ENDED" {
-// 				t.Errorf("Unexpected panic: %v", r)
-// 			}
-// 		}()
+		// Set the current time to be before voting ends
+		proposal := gGovernor.proposals[id]
+		currentTime := proposal.ExecutionState.Created + config.VotingStartDelay + config.VotingPeriod - 1
+		origTimeNow := timeNow
+		timeNow = func() time.Time { return time.Unix(int64(currentTime), 0) }
+		defer func() { timeNow = origTimeNow }()
 
-// 		Execute(id, calls)
-// 	})
-// }
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("The code did not panic")
+			} else if r != "VOTING_NOT_ENDED" {
+				t.Errorf("Unexpected panic: %v", r)
+			}
+		}()
+
+		Execute(id, calls)
+	})
+}

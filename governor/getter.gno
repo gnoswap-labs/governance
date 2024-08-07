@@ -1,83 +1,85 @@
 package governor
 
-// import (
-// 	"std"
+import (
+	"std"
 
-// 	"gno.land/p/demo/uint256"
-// )
+	"gno.land/p/demo/uint256"
+)
 
-// // GetStaker returns the address of the staker contract used by this governor.
-// func GetStaker() IStakerDispatcher {
-// 	if gGovernor == nil {
-// 		panic("governor not initialized")
-// 	}
+// TODO: Change returns to primitive types
 
-// 	return gGovernor.staker
-// }
+// GetStaker returns the address of the staker contract used by this governor.
+func GetStaker() IStakerDispatcher {
+	if gGovernor == nil {
+		panic("governor not initialized")
+	}
 
-// // GetConfig returns the current configuration of the governor.
-// func GetConfig() Config {
-// 	if gGovernor == nil {
-// 		panic("governor not initialized")
-// 	}
+	return gGovernor.staker
+}
 
-// 	return gGovernor.config
-// }
+// GetConfig returns the current configuration of the governor.
+func GetConfig() Config {
+	if gGovernor == nil {
+		panic("governor not initialized")
+	}
 
-// // GetConfigWithVersion returns the current configuration of the governor
-// // along with its version.
-// func GetConfigWithVersion() (Config, uint64) {
-// 	if gGovernor == nil {
-// 		panic("governor not initialized")
-// 	}
+	return gGovernor.config
+}
 
-// 	return gGovernor.config, gGovernor.latestConfigVersion
-// }
+// GetConfigWithVersion returns the current configuration of the governor
+// along with its version.
+func GetConfigWithVersion() (Config, uint64) {
+	if gGovernor == nil {
+		panic("governor not initialized")
+	}
 
-// // GetProposal returns the imformation for a specific proposal.
-// func GetProposal(id [32]byte) ProposalInfo {
-// 	if gGovernor == nil {
-// 		panic("governor not initialized")
-// 	}
+	return gGovernor.config, gGovernor.latestConfigVersion
+}
 
-// 	prop, exists := gGovernor.proposals[id]
-// 	if !exists {
-// 		panic("proposal not found")
-// 	}
+// GetProposal returns the imformation for a specific proposal.
+func GetProposal(id string) ProposalInfo {
+	if gGovernor == nil {
+		panic("governor not initialized")
+	}
 
-// 	return prop
-// }
+	prop, exists := gGovernor.proposals[id]
+	if !exists {
+		panic("proposal not found")
+	}
 
-// // GetProposalWithConfig returns the information for a specific proposal along with the configuration
-// // that was in effect when the proposal was created.
-// func GetProposalWithConfig(id [32]byte) (ProposalInfo, Config) {
-// 	if gGovernor == nil {
-// 		panic("governor not initialized")
-// 	}
+	return prop
+}
 
-// 	prop, exists := gGovernor.proposals[id]
-// 	if !exists {
-// 		panic("proposal not found")
-// 	}
+// GetProposalWithConfig returns the information for a specific proposal along with the configuration
+// that was in effect when the proposal was created.
+func GetProposalWithConfig(id string) (ProposalInfo, Config) {
+	if gGovernor == nil {
+		panic("governor not initialized")
+	}
 
-// 	config := GetConfigVersion(prop.ConfigVersion)
-// 	return prop, config
-// }
+	prop, exists := gGovernor.proposals[id]
+	if !exists {
+		panic("proposal not found")
+	}
 
-// // GetVote returns the vote cast by a specific voter for a specific proposal.
-// // Retuerns:
-// // 0 - Not voted
-// // 1 - Voted against
-// // 3 - Voted in favor
-// func GetVote(id [32]byte, voter std.Address) uint8 {
-// 	if gGovernor == nil {
-// 		panic("governor not initialized")
-// 	}
+	config := GetConfigVersion(prop.ConfigVersion)
+	return prop, config
+}
 
-// 	votes, exists := gGovernor.vote[id]
-// 	if !exists {
-// 		return 0 // Not voted
-// 	}
+// GetVote returns the vote cast by a specific voter for a specific proposal.
+// Retuerns:
+// 0 - Not voted
+// 1 - Voted against
+// 3 - Voted in favor
+func GetVote(id string, voter std.Address) uint8 {
+	if gGovernor == nil {
+		panic("governor not initialized")
+	}
 
-// 	return votes[voter]
-// }
+	votes, exists := gGovernor.vote[id]
+	if !exists {
+		return 0 // Not voted
+	}
+
+	return votes[voter]
+}
