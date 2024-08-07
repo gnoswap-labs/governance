@@ -373,7 +373,8 @@ func TestGetDelegatedAt(t *testing.T) {
 	}
 
 	t.Run("Non-existent delegate", func(t *testing.T) {
-		result, err := GetDelegatedAt("dummy", uint64(200))
+		dummy := testutils.TestAddress("dummy").String()
+		result, err := GetDelegatedAt(dummy, uint64(200))
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}

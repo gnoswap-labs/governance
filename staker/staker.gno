@@ -8,6 +8,7 @@ import (
 
 	"gno.land/p/demo/grc/grc20"
 	u256 "gno.land/p/demo/uint256"
+	"gno.land/p/demo/ufmt"
 )
 
 var (
@@ -46,8 +47,8 @@ func Init(token grc20.Token) {
 // It transfers tokens from the caller to the contract and updates delegatiomn records.
 func StakeAmount(delegate, amount string) {
 	delegateAddr := std.Address(delegate)
-	if delegateAddr == std.Address("") {
-		panic("invalid delegate address")
+	if !delegateAddr.IsValid() {
+		panic(ufmt.Sprintf("invalid address: %s", delegate))
 	}
 
 	amountUint, err := u256.FromDecimal(amount)
@@ -89,7 +90,14 @@ func StakeAmount(delegate, amount string) {
 // Only the delegate can call this function to withdraw their staked tokens.
 func WithdrawAmount(delegate, recipient, amount string) {
 	delegateAddr := std.Address(delegate)
-    recipientAddr := std.Address(recipient)
+	if !delegateAddr.IsValid() {
+		panic(ufmt.Sprintf("invalid address: %s", delegate))
+	}
+
+	recipientAddr := std.Address(recipient)
+	if !recipientAddr.IsValid() {
+		panic(ufmt.Sprintf("invalid address: %s", recipient))
+	}
 
     amountUint, err := u256.FromDecimal(amount)
 	if err != nil {
@@ -135,6 +143,9 @@ func WithdrawAmount(delegate, recipient, amount string) {
 // GetDelegatedCumulative gets the cumulative delegated amount * seconds for an address at a certain timestamp.
 func GetDelegatedCumulative(delegate string, timestamp uint64) (string, error) {
 	delegateAddr := std.Address(delegate)
+	if !delegateAddr.IsValid() {
+		panic(ufmt.Sprintf("invalid address: %s", delegate))
+	}
 
 	if timestamp > uint64(time.Now().Unix()) {
 		panic("FUTURE")
@@ -170,6 +181,10 @@ func GetDelegatedCumulative(delegate string, timestamp uint64) (string, error) {
 // GetAverageDelegated calculates the average delegated amount for a delegate over a given period
 func GetAverageDelegated(delegate string, start, end uint64) (string, error) {
 	delegateAddr := std.Address(delegate)
+	if !delegateAddr.IsValid() {
+		panic(ufmt.Sprintf("invalid address: %s", delegate))
+	}
+
 	res := u256.Zero()
 
 	if start > end {
@@ -252,9 +267,12 @@ func GetCurrentDelegated(delegate string) (string, error) {
 
 // GetDelegatedAt returns the delegated amount for a delegate at a specific timestamp.
 func GetDelegatedAt(delegate string, timestamp uint64) (string, error) {
-	res := u256.Zero()
 	delegateAddr := std.Address(delegate)
+	if !delegateAddr.IsValid() {
+		panic(ufmt.Sprintf("invalid address: %s", delegate))
+	}
 
+	res := u256.Zero()
 	history, exists := gStaker.delegationHistory[delegateAddr]
 	if !exists || len(history) == 0 {
 		return res.ToString(), nil
