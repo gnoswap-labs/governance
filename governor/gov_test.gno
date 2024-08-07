@@ -63,15 +63,10 @@ func TestPropose(t *testing.T) {
 
 	t.Run("Successful proposal", func(t *testing.T) {
 		Init(mockStaker, config)
-		calls := []Call{
-			{
-				To:       std.Address("test_address"),
-				Selector: 1,
-				Calldata: []byte("test_data"),
-			},
-		}
+		toAddr := std.Address("test_address").String()
+		callsJSON := ufmt.Sprintf(`[{"to":"%s","selector":1,"calldata":"test_data"}]`, toAddr)
 
-		id, err := Propose(calls)
+		id, err := Propose(callsJSON)
 		if err != nil {
 			t.Fatalf("Propose failed: %v", err)
 		}
@@ -97,14 +92,7 @@ func TestPropose(t *testing.T) {
 	t.Run("Proposal with insufficient stake", func(t *testing.T) {
 		Init(mockStaker, config)
 		mockStaker.averageDelegated = uint256.NewUint(50) // Below threshold
-
-		calls := []Call{
-			{
-				To:       std.Address("test_address"),
-				Selector: 1,
-				Calldata: []byte("test_data"),
-			},
-		}
+		callsJSON := ufmt.Sprintf(`[{"to":"%s","selector":1,"calldata":"test_data"}]`, std.Address("test_address").String())
 
 		defer func() {
 			if r := recover(); r == nil {
@@ -114,23 +102,16 @@ func TestPropose(t *testing.T) {
 			}
 		}()
 
-		Propose(calls)
+		Propose(callsJSON)
 	})
 
 	t.Run("Proposal with active proposal", func(t *testing.T) {
 		Init(mockStaker, config)
 		mockStaker.averageDelegated = uint256.NewUint(1000) // Above threshold
-
-		calls := []Call{
-			{
-				To:       std.Address("test_address"),
-				Selector: 1,
-				Calldata: []byte("test_data"),
-			},
-		}
+		callsJSON := ufmt.Sprintf(`[{"to":"%s","selector":1,"calldata":"test_data"}]`, std.Address("test_address").String())
 
 		// Create a proposal
-		Propose(calls)
+		Propose(callsJSON)
 
 		// Try to create another proposal immediately
 		defer func() {
@@ -141,7 +122,7 @@ func TestPropose(t *testing.T) {
 			}
 		}()
 
-		Propose(calls)
+		Propose(callsJSON)
 	})
 }
 

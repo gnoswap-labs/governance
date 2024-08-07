@@ -24,14 +24,14 @@ type Governor struct {
     nonce uint64
 
     // proposals stores all proposals indexed by their ID
-    proposals map[[32]byte]ProposalInfo
+    proposals map[string]ProposalInfo
 
     // latestProposalByProposer keeps track of the latest proposal ID for each proposer
-    latestProposalByProposer map[std.Address][32]byte
+    latestProposalByProposer map[std.Address]string
 
     // vote stores the voting information for each proposal
     // The uint8 value represents: 0 = not voted, 2 = voted no, 3 = voted yes
-    vote map[[32]byte]map[std.Address]uint8
+    vote map[string]map[std.Address]uint8
 }
 
 // Config represents the configuration of the governor contract
@@ -68,7 +68,7 @@ type ExecutionState struct {
 // ProposalInfo represents all the information about a proposal
 type ProposalInfo struct {
 	// The hash of the set of calls that are executed in this proposal
-	CallsHash [32]byte
+	CallsHash string
 
 	// The address of the proposer
 	Proposer std.Address
