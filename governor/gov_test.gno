@@ -116,7 +116,10 @@ func TestPropose(t *testing.T) {
 	t.Run("Proposal with active proposal", func(t *testing.T) {
 		Init(mockStaker, config)
 		mockStaker.averageDelegated = uint256.NewUint(1000) // Above threshold
-		callsJSON := ufmt.Sprintf(`[{"to":"%s","selector":1,"calldata":"test_data"}]`, std.Address("test_address").String())
+		callsJSON := ufmt.Sprintf(
+			`[{"to":"%s","selector":1,"calldata":"test_data"}]`,
+			testutils.TestAddress("test_address").String(),
+		)
 
 		// Create a proposal
 		Propose(callsJSON)
@@ -261,7 +264,7 @@ func TestProposeAndDescribe(t *testing.T) {
 
 	callsJSON := ufmt.Sprintf(
 		`[{"to":"%s","selector":1,"calldata":"test_data"}]`,
-		std.Address("test_address").String(),
+		testutils.TestAddress("test_address").String(),
 	)
 
 	description := "Test proposal description"
@@ -611,7 +614,7 @@ func TestGetConfigVersion(t *testing.T) {
 // 			tt.register(tt.selector)
 
 // 			call := Call{
-// 				To:       std.Address("test_address"),
+// 				To:       testutils.TestAddress("test_address"),
 // 				Selector: tt.selector,
 // 				Calldata: tt.calldata,
 // 			}

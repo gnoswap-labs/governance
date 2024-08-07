@@ -8,30 +8,30 @@ import (
 
 // Governor represents the governor contract
 type Governor struct {
-    // staker is the interface to interact with the staking contract
-    staker IStakerDispatcher
+	// staker is the interface to interact with the staking contract
+	staker IStakerDispatcher
 
-    // config is the current configuration of the governor
-    config Config
+	// config is the current configuration of the governor
+	config Config
 
-    // configVersions stores all historical configurations indexed by their version number
-    configVersions map[uint64]Config
+	// configVersions stores all historical configurations indexed by their version number
+	configVersions map[uint64]Config
 
-    // latestConfigVersion is the version number of the most recent configuration
-    latestConfigVersion uint64
+	// latestConfigVersion is the version number of the most recent configuration
+	latestConfigVersion uint64
 
-    // nonce is used to generate unique proposal IDs
-    nonce uint64
+	// nonce is used to generate unique proposal IDs
+	nonce uint64
 
-    // proposals stores all proposals indexed by their ID
-    proposals map[string]ProposalInfo
+	// proposals stores all proposals indexed by their ID
+	proposals map[string]ProposalInfo
 
-    // latestProposalByProposer keeps track of the latest proposal ID for each proposer
-    latestProposalByProposer map[std.Address]string
+	// latestProposalByProposer keeps track of the latest proposal ID for each proposer
+	latestProposalByProposer map[std.Address]string
 
-    // vote stores the voting information for each proposal
-    // The uint8 value represents: 0 = not voted, 2 = voted no, 3 = voted yes
-    vote map[string]map[std.Address]uint8
+	// vote stores the voting information for each proposal
+	// The uint8 value represents: 0 = not voted, 2 = voted no, 3 = voted yes
+	vote map[string]map[std.Address]uint8
 }
 
 // Config represents the configuration of the governor contract

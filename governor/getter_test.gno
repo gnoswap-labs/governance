@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"gno.land/p/demo/testutils"
 	"gno.land/p/demo/json"
+	"gno.land/p/demo/testutils"
 	"gno.land/p/demo/ufmt"
 	"gno.land/p/demo/uint256"
 )

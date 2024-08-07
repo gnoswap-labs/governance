@@ -5,8 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"std"
-	"strings"
 	"strconv"
+	"strings"
 	"time"
 
 	"gno.land/p/demo/grc/grc20"
@@ -457,16 +457,16 @@ type Call struct {
 // hashCalls computes the hash of a list of calls
 
 func hashCalls(calls []Call) string {
-    var buf strings.Builder
-    buf.WriteString("governance::governor::Governor::hash_calls")
+	var buf strings.Builder
+	buf.WriteString("governance::governor::Governor::hash_calls")
 
-    for _, call := range calls {
-        buf.WriteString(string(call.To))
-        buf.WriteString(strconv.FormatUint(call.Selector, 10))
-        buf.Write(call.Calldata)
-    }
+	for _, call := range calls {
+		buf.WriteString(string(call.To))
+		buf.WriteString(strconv.FormatUint(call.Selector, 10))
+		buf.Write(call.Calldata)
+	}
 
-    return buf.String()
+	return buf.String()
 }
 
 func b2i(b bool) uint8 {
