@@ -49,8 +49,8 @@ func (m *mockGRC20) TotalSupply() uint64 {
 	return m.totalSupply
 }
 
-func (m *mockGRC20) BalanceOf(account std.Address) (uint64, error) {
-	return m.balances[account], nil
+func (m *mockGRC20) BalanceOf(account std.Address) uint64 {
+	return m.balances[account]
 }
 
 func (m *mockGRC20) Transfer(to std.Address, amount uint64) error {
@@ -63,8 +63,8 @@ func (m *mockGRC20) Transfer(to std.Address, amount uint64) error {
 	return nil
 }
 
-func (m *mockGRC20) Allowance(owner, spender std.Address) (uint64, error) {
-	return m.allowances[owner][spender], nil
+func (m *mockGRC20) Allowance(owner, spender std.Address) uint64 {
+	return m.allowances[owner][spender]
 }
 
 func (m *mockGRC20) Approve(spender std.Address, amount uint64) error {
@@ -151,7 +151,7 @@ func TestWithdrawAmount(t *testing.T) {
 		t.Errorf("WithdrawAmount did not add to delegationHistory")
 	}
 
-	recipientBalance, _ := token.BalanceOf(recipient)
+	recipientBalance := token.BalanceOf(recipient)
 	if recipientBalance != 50 {
 		t.Errorf("WithdrawAmount did not transfer tokens correctly")
 	}
