@@ -95,7 +95,7 @@ func (m *mockGRC20) TransferFrom(from, to std.Address, amount uint64) error {
 var testAddr = testutils.TestAddress("testAddr")
 
 func TestGetStaker(t *testing.T) {
-	New(testAddr, nil, "test token", "TST")
+	New(testAddr, nil, "test token", "TST", "")
 
 	result := GetStaker()
 	if result != testAddr {
@@ -104,7 +104,7 @@ func TestGetStaker(t *testing.T) {
 }
 
 func TestDelegatedTo(t *testing.T) {
-	New(testAddr, nil, "Test Token", "TST")
+	New(testAddr, nil, "Test Token", "TST", "")
 
 	// Create test addresses
 	owner1Addr := testutils.TestAddress("owner1")
@@ -171,7 +171,8 @@ func TestDelegatedTo(t *testing.T) {
 
 func TestDeposit(t *testing.T) {
 	mockToken := newMockGRC20("Test Token", "TST", 18)
-	New(testAddr, mockToken, "Test Token", "TST")
+	contractAddr := testutils.TestAddress("delegationContract")
+    New(testAddr, mockToken, "Test Token", "TST", contractAddr)
 
 	owner := testutils.TestAddress("owner")
 	std.TestSetOrigCaller(owner)
@@ -181,7 +182,7 @@ func TestDeposit(t *testing.T) {
 	allowance := uint64(500)
 	depositAmount := u256.NewUint(300)
 	mockToken.balances[owner] = initialBalance
-	mockToken.Approve(std.GetOrigPkgAddr(), allowance)
+	mockToken.Approve(contractAddr, allowance)
 
 	Deposit("300", owner.String())
 
@@ -206,7 +207,7 @@ func TestDeposit(t *testing.T) {
 
 func TestDepositZeroAmount(t *testing.T) {
 	mockToken := newMockGRC20("Test Token", "TST", 18)
-	New(testAddr, mockToken, "Test Token", "TST")
+	New(testAddr, mockToken, "Test Token", "TST", "")
 
 	owner := testutils.TestAddress("owner")
 	std.TestSetOrigCaller(owner)
@@ -233,7 +234,8 @@ func TestDepositZeroAmount(t *testing.T) {
 
 func TestWithdraw(t *testing.T) {
 	mockToken := newMockGRC20("Test Token", "TST", 18)
-	New(testAddr, mockToken, "Test Token", "TST")
+	contractAddr := testutils.TestAddress("delegationContract")
+	New(testAddr, mockToken, "Test Token", "TST", contractAddr)
 
 	owner := testutils.TestAddress("owner")
 	std.TestSetOrigCaller(owner)
@@ -242,7 +244,7 @@ func TestWithdraw(t *testing.T) {
 	initialBalance := uint64(1000)
 	depositAmount := u256.NewUint(500)
 	mockToken.balances[owner] = initialBalance
-	mockToken.Approve(std.GetOrigPkgAddr(), depositAmount.Uint64())
+	mockToken.Approve(contractAddr, depositAmount.Uint64())
 	Deposit(depositAmount.ToString(), owner.String())
 
 	// Check initial delegated token balance
@@ -268,4 +270,39 @@ func TestWithdraw(t *testing.T) {
 	if originalBalance != expectedBalance {
 		t.Errorf("After Withdraw(), original token balance = %v, want %v", originalBalance, expectedBalance)
 	}
+}
+
+func TestGetOrigPkgAddrInDifferentRealm(t *testing.T) {
+    mockToken := newMockGRC20("Test Token", "TST", 18)
+	delegationContractAddr := testutils.TestAddress("delegationContract")
+    New(testAddr, mockToken, "Test Token", "TST", delegationContractAddr)
+
+    userAddr := testutils.TestAddress("user")
+    otherRealmAddr := testutils.TestAddress("otherRealm")
+
+    // simulate call stack: user => other realm => delegation contract
+    std.TestSetOrigCaller(userAddr)
+    std.TestSetOrigPkgAddr(otherRealmAddr)
+
+    // initial balance and allowance
+    initialBalance := uint64(1000)
+    allowance := uint64(500)
+    mockToken.balances[userAddr] = initialBalance
+    mockToken.Approve(delegationContractAddr, allowance)
+
+    // call Deposit function
+    depositAmount := "300"
+    Deposit(depositAmount, userAddr.String())
+
+    // verify that std.GetOrigPkgAddr() returned the correct address
+    if gDelegatedToken.contractAddr != delegationContractAddr {
+        t.Errorf("std.GetOrigPkgAddr() returned %v, want %v", gDelegatedToken.contractAddr.String(), delegationContractAddr.String())
+    }
+
+    // verify that the deposit was successful
+    expectedBalance := u256.NewUint(300)
+    actualBalance := BalanceOf(userAddr.String())
+    if actualBalance.Cmp(expectedBalance) != 0 {
+        t.Errorf("Unexpected balance after deposit. Got %v, want %v", actualBalance, expectedBalance)
+    }
 }

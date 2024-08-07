@@ -45,12 +45,16 @@ type DelegatedToken struct {
 
 	// decimals is the number of decimal places for the delegated token.
 	decimals   uint8
+
+	// contractAddr is the address of this delegated token contract.
+    // It's used to ensure correct functionality when called from different realms.
+	contractAddr std.Address
 }
 
 var gDelegatedToken *DelegatedToken
 
 // New creates a new instance of the DelegatedToken.
-func New(staker std.Address, token grc20.Token, name string, symbol string) {
+func New(staker std.Address, token grc20.Token, name string, symbol string, contractAddr std.Address) {
 	gDelegatedToken = &DelegatedToken{
 		staker:      staker,
 		token:       token,
@@ -59,6 +63,7 @@ func New(staker std.Address, token grc20.Token, name string, symbol string) {
 		totalSupply: u256.Zero(),
 		name:        name,
 		symbol:      symbol,
+		contractAddr: contractAddr,
 	}
 }
 
@@ -117,6 +122,7 @@ func Deposit(amount, caller string) {
 
 	callerAddr := std.Address(caller)
 	token := gDelegatedToken.token
+	contractAddr := gDelegatedToken.contractAddr
 
 	amountUint, err := u256.FromDecimal(amount)
 	if err != nil {
@@ -130,13 +136,13 @@ func Deposit(amount, caller string) {
 	}
 
 	// check allowance
-	allowance := token.Allowance(callerAddr, std.GetOrigPkgAddr())
+	allowance := token.Allowance(callerAddr, contractAddr)
 	if u256.NewUint(allowance).Cmp(amountUint) < 0 {
 		panic("insufficient allowance")
 	}
 
 	// transfer tokens from caller to this contract
-	err = token.TransferFrom(callerAddr, std.GetOrigPkgAddr(), amountUint.Uint64())
+	err = token.TransferFrom(callerAddr, contractAddr, amountUint.Uint64())
 	if err != nil {
 		panic("transfer failed: " + err.Error())
 	}
