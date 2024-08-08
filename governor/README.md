@@ -2,6 +2,25 @@
 
 ## Overview
 
+```mermaid
+graph TD
+    A[Initialize Governor] --> B[Create Proposal]
+    B --> C{Voting Period}
+    C --> |Yes| D[Execute Proposal]
+    C --> |No| E[Cancel Proposal]
+    B --> F[Describe Proposal]
+    C --> G[Vote on Proposal]
+    H[Reconfigure] --> A
+    I[Get Proposal Info] --> C
+    J[Get Config] --> A
+    K[Get Votes] --> C
+
+    classDef process fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef decision fill:#bbf,stroke:#333,stroke-width:2px;
+    class A,B,D,E,F,G,H,I,J,K process;
+    class C decision;
+```
+
 The Governor contract is a decentralized governance system implemented in gno for the gno.land. It allows token holders to propose, vote on, and execute changes to the system.
 
 ## Features
