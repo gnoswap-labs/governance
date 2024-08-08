@@ -91,19 +91,21 @@ func TestStakeAmount(t *testing.T) {
 	token := newMockGRC20("Test Token", "TST", 42)
 	Init(token)
 
-	delegate := std.Address("delegate")
-	amount := u256.NewUint(100)
+	delegateAddr := testutils.TestAddress("delegate")
+	delegate := delegateAddr.String()
 
 	// Set up some balance for the caller
 	caller := std.GetOrigCaller()
 	token.balances[caller] = 1000
 
-	err := StakeAmount(delegate, amount)
-	if err != nil {
-		t.Errorf("StakeAmount returned an unexpected error: %v", err)
-	}
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("StakeAmount panicked: %v", r)
+		}
+	}()
+	StakeAmount(delegate, "100")
 
-	if gStaker.delegations[delegate].Uint64() != 100 {
+	if gStaker.delegations[delegateAddr].Uint64() != 100 {
 		t.Errorf("StakeAmount did not update delegations correctly")
 	}
 
@@ -111,7 +113,7 @@ func TestStakeAmount(t *testing.T) {
 		t.Errorf("StakeAmount did not update totalStaked correctly")
 	}
 
-	if len(gStaker.delegationHistory[delegate]) != 1 {
+	if len(gStaker.delegationHistory[delegateAddr]) != 1 {
 		t.Errorf("StakeAmount did not add to delegationHistory")
 	}
 }
@@ -120,26 +122,28 @@ func TestWithdrawAmount(t *testing.T) {
 	token := newMockGRC20("Test Token", "TST", 42)
 	Init(token)
 
-	delegate := std.GetOrigCaller()
-	recipient := std.Address("recipient")
-	stakeAmount := u256.NewUint(100)
+	caller := std.GetOrigCaller()
+	delegate := caller.String()
+
+	recipientAddr := testutils.TestAddress("recipient")
+	recipient := recipientAddr.String()
+
 	withdrawAmount := u256.NewUint(50)
 
 	// First, stake some amount
-	caller := std.GetOrigCaller()
 	token.balances[caller] = 1000
-	err := StakeAmount(delegate, stakeAmount)
-	if err != nil {
-		t.Fatalf("Failed to stake initial amount: %v", err)
-	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("WithdrawAmount panicked: %v", r)
+		}
+	}()
+	StakeAmount(delegate, "100")
 
 	// now, try to withdraw
-	err = WithdrawAmount(delegate, recipient, withdrawAmount)
-	if err != nil {
-		t.Errorf("WithdrawAmount returned an unexpected error: %v", err)
-	}
+	WithdrawAmount(delegate, recipient, "50")
 
-	if gStaker.delegations[delegate].Uint64() != 50 {
+	if gStaker.delegations[caller].Uint64() != 50 {
 		t.Errorf("WithdrawAmount did not update delegations correctly")
 	}
 
@@ -147,30 +151,13 @@ func TestWithdrawAmount(t *testing.T) {
 		t.Errorf("WithdrawAmount did not update totalStaked correctly")
 	}
 
-	if len(gStaker.delegationHistory[delegate]) != 2 {
+	if len(gStaker.delegationHistory[caller]) != 2 {
 		t.Errorf("WithdrawAmount did not add to delegationHistory")
 	}
 
-	recipientBalance := token.BalanceOf(recipient)
+	recipientBalance := token.BalanceOf(recipientAddr)
 	if recipientBalance != 50 {
 		t.Errorf("WithdrawAmount did not transfer tokens correctly")
-	}
-}
-
-func TestWithdrawAmount_CallerNotDelegate(t *testing.T) {
-	token := newMockGRC20("Test Token", "TST", 42)
-	Init(token)
-
-	delegate := std.Address("delegate")
-	recipient := std.Address("recipient")
-	stakeAmount := u256.NewUint(100)
-	withdrawAmount := u256.NewUint(50)
-
-	caller := std.GetOrigCaller()
-	token.balances[caller] = 1000
-	err := StakeAmount(delegate, stakeAmount) // must std.GetOrigCaller() != delegate
-	if err != nil {
-		t.Fatalf("Failed to stake initial amount: %v", err)
 	}
 }
 
@@ -178,17 +165,19 @@ func TestGetAverageDelegated(t *testing.T) {
 	token := newMockGRC20("Test Token", "TST", 42)
 	Init(token)
 
-	delegate := std.Address("delegate")
-	stakeAmount := u256.NewUint(0)
+	delegateAddr := testutils.TestAddress("delegate")
+	delegate := delegateAddr.String()
 
-	err := StakeAmount(delegate, stakeAmount)
-	if err != nil {
-		t.Fatalf("Failed to stake initial amount: %v", err)
-	}
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("GetAverageDelegated panicked: %v", r)
+		}
+	}()
+	StakeAmount(delegate, "0")
 
 	// simulate time passing and additional stakes
 	currentTime := uint64(1000)
-	gStaker.delegationHistory[delegate] = []DelegationHistory{
+	gStaker.delegationHistory[delegateAddr] = []DelegationHistory{
 		{amount: u256.NewUint(1000), timestamp: currentTime},
 		{amount: u256.NewUint(1500), timestamp: currentTime + 100},
 		{amount: u256.NewUint(2000), timestamp: currentTime + 200},
@@ -198,37 +187,37 @@ func TestGetAverageDelegated(t *testing.T) {
 		name           string
 		start          uint64
 		end            uint64
-		expectedResult *u256.Uint
+		expectedResult string
 	}{
 		{
 			name:           "Full period average",
 			start:          currentTime,
 			end:            currentTime + 200,
-			expectedResult: u256.NewUint(1250), // (1000*100 + 1500*100 + 2000*0) / 200
+			expectedResult: "1250", // (1000*100 + 1500*100 + 2000*0) / 200
 		},
 		{
 			name:           "Partial period average",
 			start:          currentTime + 50,
 			end:            currentTime + 150,
-			expectedResult: u256.NewUint(1250), // (1000*50 + 1500*50) / 100
+			expectedResult: "1250", // (1000*50 + 1500*50) / 100
 		},
 		{
 			name:           "Single point in time",
 			start:          currentTime + 100,
 			end:            currentTime + 100,
-			expectedResult: u256.NewUint(1500),
+			expectedResult: "1500",
 		},
 		{
 			name:           "Period before any stakes",
 			start:          currentTime - 100,
 			end:            currentTime - 50,
-			expectedResult: u256.NewUint(0),
+			expectedResult: "0",
 		},
 		{
 			name:           "Period after all recorded stakes",
 			start:          currentTime + 300,
 			end:            currentTime + 400,
-			expectedResult: u256.NewUint(2000),
+			expectedResult: "2000",
 		},
 	}
 
@@ -238,8 +227,8 @@ func TestGetAverageDelegated(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			if result.Cmp(tt.expectedResult) != 0 {
-				t.Errorf("Expected %s, got %s", tt.expectedResult.ToString(), result.ToString())
+			if result != tt.expectedResult {
+				t.Errorf("Expected %s, got %s", tt.expectedResult, result)
 			}
 		})
 	}
@@ -249,38 +238,40 @@ func TestGetAverageDelegatedOverLast(t *testing.T) {
 	token := newMockGRC20("Test Token", "TST", 42)
 	Init(token)
 
-	delegate := std.Address("delegate")
-	stakeAmount := u256.NewUint(0)
+	delegateAddr := testutils.TestAddress("delegate")
+	delegate := delegateAddr.String()
 
-	err := StakeAmount(delegate, stakeAmount)
-	if err != nil {
-		t.Fatalf("Failed to stake initial amount: %v", err)
-	}
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("GetAverageDelegatedOverLast panicked: %v", r)
+		}
+	}()
+	StakeAmount(delegate, "0")
 
 	// Set up delegation history
 	now := uint64(time.Now().Unix())
-	gStaker.delegationHistory[delegate] = []DelegationHistory{
+	gStaker.delegationHistory[delegateAddr] = []DelegationHistory{
 		{amount: u256.NewUint(1000), timestamp: now - 100},
 		{amount: u256.NewUint(2000), timestamp: now - 50},
 		{amount: u256.NewUint(3000), timestamp: now},
 	}
 
-	avg, err := GetAverageDelegatedOverLast(delegate, 100)
+	avg, err := GetAverageDelegatedOverLast(delegate, uint64(100))
 	if err != nil {
 		t.Fatalf("GetAverageDelegatedOverLast failed: %v", err)
 	}
 
-	expected := u256.NewUint(1500) // (1000*50 + 2000*50) / 100
-	if avg.Cmp(expected) != 0 {
-		t.Errorf("Incorrect average delegated over last. Expected %v, got %v", expected, avg)
+	if avg != "1500" { // (1000*50 + 2000*50) / 100
+		t.Errorf("Expected 1500, got %s", avg)
 	}
 }
 
 func TestGetCurrentDelegated(t *testing.T) {
 	token := newMockGRC20("Test Token", "TST", 18)
 	Init(token)
-	delegate1 := std.Address("delegate1")
-	delegate2 := std.Address("delegate2")
+
+	delegate1 := testutils.TestAddress("delegate1")
+	delegate2 := testutils.TestAddress("delegate2")
 
 	// Set up delegation history for delegate1
 	gStaker.delegationHistory[delegate1] = []DelegationHistory{
@@ -291,18 +282,18 @@ func TestGetCurrentDelegated(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		delegate       std.Address
-		expectedResult *u256.Uint
+		delegate       string
+		expectedResult string
 	}{
 		{
 			name:           "Delegate with history",
-			delegate:       delegate1,
-			expectedResult: u256.NewUint(2000),
+			delegate:       delegate1.String(),
+			expectedResult: "2000",
 		},
 		{
 			name:           "Delegate without history",
-			delegate:       delegate2,
-			expectedResult: u256.NewUint(0),
+			delegate:       delegate2.String(),
+			expectedResult: "0",
 		},
 	}
 
@@ -312,8 +303,8 @@ func TestGetCurrentDelegated(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			if result.Cmp(tt.expectedResult) != 0 {
-				t.Errorf("Expected %s, got %s", tt.expectedResult.ToString(), result.ToString())
+			if result != tt.expectedResult {
+				t.Errorf("Expected %s, got %s", tt.expectedResult, result)
 			}
 		})
 	}
@@ -322,9 +313,11 @@ func TestGetCurrentDelegated(t *testing.T) {
 func TestGetDelegatedAt(t *testing.T) {
 	token := newMockGRC20("Test Token", "TST", 18)
 	Init(token)
-	delegate := std.Address("delegate")
 
-	gStaker.delegationHistory[delegate] = []DelegationHistory{
+	delegateAddr := testutils.TestAddress("delegate")
+	delegate := delegateAddr.String()
+
+	gStaker.delegationHistory[delegateAddr] = []DelegationHistory{
 		{amount: u256.NewUint(1000), timestamp: 100},
 		{amount: u256.NewUint(1500), timestamp: 200},
 		{amount: u256.NewUint(2000), timestamp: 300},
@@ -333,37 +326,37 @@ func TestGetDelegatedAt(t *testing.T) {
 	tests := []struct {
 		name           string
 		timestamp      uint64
-		expectedResult *u256.Uint
+		expectedResult string
 	}{
 		{
 			name:           "Before first delegation",
 			timestamp:      50,
-			expectedResult: u256.NewUint(0),
+			expectedResult: "0",
 		},
 		{
 			name:           "At first delegation",
 			timestamp:      100,
-			expectedResult: u256.NewUint(1000),
+			expectedResult: "1000",
 		},
 		{
 			name:           "Between first and second delegation",
 			timestamp:      150,
-			expectedResult: u256.NewUint(1000),
+			expectedResult: "1000",
 		},
 		{
 			name:           "At second delegation",
 			timestamp:      200,
-			expectedResult: u256.NewUint(1500),
+			expectedResult: "1500",
 		},
 		{
 			name:           "At last delegation",
 			timestamp:      300,
-			expectedResult: u256.NewUint(2000),
+			expectedResult: "2000",
 		},
 		{
 			name:           "After last delegation",
 			timestamp:      400,
-			expectedResult: u256.NewUint(2000),
+			expectedResult: "2000",
 		},
 	}
 
@@ -373,20 +366,20 @@ func TestGetDelegatedAt(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			if result.Cmp(tt.expectedResult) != 0 {
-				t.Errorf("Expected %s, got %s", tt.expectedResult.ToString(), result.ToString())
+			if result != tt.expectedResult {
+				t.Errorf("Expected %s, got %s", tt.expectedResult, result)
 			}
 		})
 	}
 
 	t.Run("Non-existent delegate", func(t *testing.T) {
-		dummyAddr := testutils.TestAddress("dummy")
-		result, err := GetDelegatedAt(dummyAddr, 200)
+		dummy := testutils.TestAddress("dummy").String()
+		result, err := GetDelegatedAt(dummy, uint64(200))
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
-		if !result.IsZero() {
-			t.Errorf("Expected 0, got %s", result.ToString())
+		if result != "0" {
+			t.Errorf("Expected 0, got %s", result)
 		}
 	})
 }
