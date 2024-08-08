@@ -12,14 +12,17 @@ The following diagram illustrates the flow of delegation in the `delegation` pac
 
 ```mermaid
 graph TD
-    A[Token Holder] -->|Approves tokens| B(Delegation Contract)
-    A -->|Deposits tokens| B
-    B -->|Mints delegated tokens| A
-    A -->|Delegates to| C[Delegatee]
-    C -->|Votes with delegated power| D[Governance]
-    A -->|Withdraws tokens| B
-    B -->|Burns delegated tokens| A
-    B -->|Returns original tokens| A
+    A[Token Holder] -->|1. Approves tokens| B(Delegation Contract)
+    A -->|2. Deposits tokens| B
+    B -->|3. Mints delegated tokens| A
+    A -->|4. Delegates voting power| C[Delegatee]
+    C -->|5. Votes with delegated power| D[Governance]
+    
+    subgraph "Withdrawal Process"
+    A -->|6. Initiates withdrawal| B
+    B -->|7. Burns delegated tokens| B
+    B -->|8. Returns original tokens| A
+    end
 ```
 
 ## Usage
