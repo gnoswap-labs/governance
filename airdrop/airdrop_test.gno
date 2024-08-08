@@ -13,6 +13,8 @@ import (
 	u256 "gno.land/p/demo/uint256"
 )
 
+var testAddress = testutils.TestAddress("test")
+
 // mockGRC20 is a mock implementation of the IGRC20 interface for testing
 type mockGRC20 struct {
 	balances    map[std.Address]uint64
@@ -89,8 +91,7 @@ func (m *mockGRC20) TransferFrom(from, to std.Address, amount uint64) error {
 ///////////////////////////////////////////////////////////////////////////////////////
 
 func TestClaimIDToBitmapIndex(t *testing.T) {
-	address := std.Address("test")
-	a := NewAirdrop(nil, Config{}, address)
+	a := NewAirdrop(nil, Config{}, testAddress)
 
 	tests := []struct {
 		claimID       uint64
@@ -114,8 +115,7 @@ func TestClaimIDToBitmapIndex(t *testing.T) {
 }
 
 func TestIsClaimed(t *testing.T) {
-	address := std.Address("test")
-	a := NewAirdrop(nil, Config{}, address)
+	a := NewAirdrop(nil, Config{}, testAddress)
 
 	// Test unclaimed
 	if a.IsClaimed(0) {
@@ -137,10 +137,9 @@ func TestIsClaimed(t *testing.T) {
 }
 
 func TestClaim(t *testing.T) {
-	address := std.Address("test")
 	mockToken := NewMockGRC20("Test Token", "TST", 18)
 
-	airdrop := NewAirdrop(mockToken, Config{}, address)
+	airdrop := NewAirdrop(mockToken, Config{}, testAddress)
 
 	// Set up some initial balances
 	airdropAddress := std.GetOrigCaller()
@@ -199,11 +198,10 @@ func TestClaim(t *testing.T) {
 }
 
 func TestClaim64(t *testing.T) {
-	address := std.Address("test")
 	mockToken := NewMockGRC20("Test Token", "TST", 18)
 
 	// Create a new Airdrop instance
-	airdrop := NewAirdrop(mockToken, Config{}, address)
+	airdrop := NewAirdrop(mockToken, Config{}, testAddress)
 
 	// Set up some initial balances
 	airdropAddress := std.GetOrigCaller()
@@ -292,61 +290,157 @@ func TestClaim64(t *testing.T) {
 }
 
 func TestRefund(t *testing.T) {
-	token := NewMockGRC20("Test Token", "TST", 18)
+	mockToken := NewMockGRC20("Test Token", "TST", 18)
 	refundTo := testutils.TestAddress("refund_to")
-	config := Config{
-		RefundableTimestamp: uint64(time.Now().Add(time.Hour).Unix()),
-		RefundTo:            refundTo,
-	}
-	airdrop := NewAirdrop(token, config, testutils.TestAddress("airdrop"))
+	airdropAddr := testutils.TestAddress("airdrop")
 
-	// Set some balance for the airdrop contract
-	token.balances[airdrop.address] = 1000
+	// Set up initial balances
+	mockToken.balances[airdropAddr] = 1000000
 
-	t.Run("Refund before refundable timestamp", func(t *testing.T) {
+	t.Run("Refund not allowed", func(t *testing.T) {
+		config := Config{
+			RefundableTimestamp: 0,
+			RefundTo:            refundTo,
+		}
+		airdrop := NewAirdrop(mockToken, config, airdropAddr)
+
 		defer func() {
 			if r := recover(); r == nil {
-				t.Errorf("Expected panic but got none")
+				t.Errorf("The code did not panic")
+			} else if r != ErrRefundNotAllowed {
+				t.Errorf("Expected ErrRefundNotAllowed, got %v", r)
+			}
+		}()
+		airdrop.Refund()
+	})
+
+	t.Run("Refund too early", func(t *testing.T) {
+		config := Config{
+			RefundableTimestamp: uint64(time.Now().Add(time.Hour).Unix()),
+			RefundTo:            refundTo,
+		}
+		airdrop := NewAirdrop(mockToken, config, airdropAddr)
+
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("The code did not panic")
 			} else if r != ErrTooEarly {
-				t.Errorf("Expected ErrTooEarly panic but got: %v", r)
+				t.Errorf("Expected ErrTooEarly, got %v", r)
+			}
+		}()
+		airdrop.Refund()
+	})
+
+	t.Run("No balance to refund", func(t *testing.T) {
+		config := Config{
+			RefundableTimestamp: uint64(time.Now().Add(-time.Hour).Unix()),
+			RefundTo:            refundTo,
+		}
+		airdrop := NewAirdrop(mockToken, config, airdropAddr)
+		mockToken.balances[airdropAddr] = 0
+
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("The code did not panic")
+			} else if r != ErrNoBalance {
+				t.Errorf("Expected ErrNoBalance, got %v", r)
 			}
 		}()
 		airdrop.Refund()
 	})
 
 	t.Run("Successful refund", func(t *testing.T) {
-		// Set current time to after refundable timestamp
-		oldTimeNow := timeNow
-		timeNow = func() time.Time {
-			return time.Unix(int64(config.RefundableTimestamp+1), 0)
+		config := Config{
+			RefundableTimestamp: uint64(time.Now().Add(-time.Hour).Unix()),
+			RefundTo:            refundTo,
 		}
-		defer func() { timeNow = oldTimeNow }()
+		airdrop := NewAirdrop(mockToken, config, airdropAddr)
+		mockToken.balances[airdropAddr] = 1000000
 
 		err := airdrop.Refund()
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
-		if balance := token.balances[refundTo]; balance != 1000 {
-			t.Errorf("Expected refund balance to be 1000, got %d", balance)
+		if mockToken.balances[refundTo] != 1000000 {
+			t.Errorf("Expected refund balance to be 1000000, got %d", mockToken.balances[refundTo])
 		}
 
-		if balance := token.balances[airdrop.address]; balance != 0 {
-			t.Errorf("Expected airdrop balance to be 0, got %d", balance)
+		if mockToken.balances[airdropAddr] != 0 {
+			t.Errorf("Expected airdrop balance to be 0, got %d", mockToken.balances[airdropAddr])
 		}
 	})
+}
 
-	// t.Run("Refund with no balance", func(t *testing.T) {
-	//     token.balances[airdrop.address] = 0
-	//     defer func() {
-	//         if r := recover(); r == nil {
-	//             t.Errorf("Expected panic but got none")
-	//         } else if r != ErrNoBalance {
-	//             t.Errorf("Expected ErrNoBalance panic but got: %v", r)
-	//         }
-	//     }()
-	//     airdrop.Refund()
-	// })
+func TestAirdropWithSnapshot(t *testing.T) {
+	mockToken := NewMockGRC20("Test Token", "TST", 18)
+
+	airdrop := NewAirdrop(mockToken, Config{}, testAddress)
+
+	// Set up some initial balances
+	airdropAddress := std.GetOrigCaller()
+	mockToken.balances[airdropAddress] = 1000000 // Initial balance of airdrop contract
+
+	// Create 128 claims (2 batches of 64)
+	claims := make([]Claim, 128)
+	for i := 0; i < 128; i++ {
+		claims[i] = Claim{
+			ID:      uint64(i * 64), // Ensure first claim ID is multiple of 64
+			Claimee: testutils.TestAddress(ufmt.Sprintf("claimee%d", i)),
+			Amount:  uint256.NewUint(1000), // Each claim is for 1000 tokens
+		}
+	}
+
+	// Process first batch of claims
+	claimed, _ := airdrop.Claim64(claims[:64])
+	if claimed != 64 {
+		t.Errorf("Expected 64 claims, got %d", claimed)
+	}
+
+	// Create a snapshot after first batch
+	caller := airdropAddress.String()
+	snapshotID := airdrop.CreateSnapshot(caller)
+
+	// Process second batch of claims
+	claimed, _ = airdrop.Claim64(claims[64:])
+	if claimed != 64 {
+		t.Errorf("Expected 64 claims, got %d", claimed)
+	}
+
+	// Check balances after all claims
+	airdropBalance := mockToken.BalanceOf(airdropAddress)
+	if airdropBalance != 872000 { // 1000000 - (128 * 1000)
+		t.Errorf("Expected airdrop balance to be 872000, got %d", airdropBalance)
+	}
+
+	// Test snapshot state (simplified)
+	sampleClaimIDs := []uint64{0, 63, 64, 127}
+	for _, claimID := range sampleClaimIDs {
+		expectedClaimed := claimID < 64
+		isClaimed, err := airdrop.IsClaimedAtSnapshot(snapshotID, claimID)
+		if err != nil {
+			t.Errorf("Unexpected error checking claim status: %v", err)
+		}
+		if isClaimed != expectedClaimed {
+			t.Errorf("For claim %d, expected claimed status %v, got %v", claimID, expectedClaimed, isClaimed)
+		}
+	}
+
+	// Test invalid snapshot ID
+	_, err := airdrop.IsClaimedAtSnapshot(snapshotID+1, 0)
+	if err == nil {
+		t.Error("Expected error for invalid snapshot ID, got nil")
+	}
+
+	// Get snapshot and check remaining tokens
+	snapshot, err := airdrop.GetSnapshot(snapshotID)
+	if err != nil {
+		t.Errorf("Unexpected error getting snapshot: %v", err)
+	}
+	expectedRemainingTokens := uint64(936000) // 1000000 - (64 * 1000)
+	if snapshot.RemainingTokens != expectedRemainingTokens {
+		t.Errorf("Expected remaining tokens %d, got %d", expectedRemainingTokens, snapshot.RemainingTokens)
+	}
 }
 
 func TestParseAirdropData(t *testing.T) {

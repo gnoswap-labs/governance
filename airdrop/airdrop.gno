@@ -10,6 +10,7 @@ import (
 	"gno.land/p/demo/grc/grc20"
 	"gno.land/p/demo/ufmt"
 	u256 "gno.land/p/demo/uint256"
+	"gno.land/r/governance/snapshot"
 )
 
 var (
@@ -38,19 +39,21 @@ type Config struct {
 
 // Airdrop represents the airdrop contract
 type Airdrop struct {
-	token         grc20.Token
-	config        Config
-	claimedBitmap map[uint64]uint64
-	address       std.Address
+	token           grc20.Token
+	config          Config
+	claimedBitmap   map[uint64]uint64 // claimID -> bitmap
+	address         std.Address
+	snapshotManager *snapshot.Manager
 }
 
 // NewAirdrop creates a new Airdrop instance
 func NewAirdrop(token grc20.Token, config Config, addr std.Address) *Airdrop {
 	return &Airdrop{
-		token:         token,
-		config:        config,
-		claimedBitmap: make(map[uint64]uint64),
-		address:       addr,
+		token:           token,
+		config:          config,
+		claimedBitmap:   make(map[uint64]uint64),
+		address:         addr,
+		snapshotManager: snapshot.NewManager(),
 	}
 }
 
@@ -187,6 +190,22 @@ func (a *Airdrop) GetConfig() Config {
 
 func (a *Airdrop) GetAddress() std.Address {
 	return a.address
+}
+
+// CreateSnapshot creates a new snapshot of the current state
+func (a *Airdrop) CreateSnapshot(caller string) uint64 {
+	callerAddr := std.Address(caller)
+	return a.snapshotManager.CreateSnapshot(a.claimedBitmap, a.token.BalanceOf(callerAddr))
+}
+
+// IsClaimedAtSnapshot checks if a claim was made at a specific snapshot
+func (a *Airdrop) IsClaimedAtSnapshot(snapshotID uint64, claimID uint64) (bool, error) {
+	return a.snapshotManager.IsClaimedAtSnapshot(snapshotID, claimID)
+}
+
+// GetSnapshot retrieves a specific snapshot
+func (a *Airdrop) GetSnapshot(id uint64) (snapshot.Snapshot, error) {
+	return a.snapshotManager.GetSnapshot(id)
 }
 
 // ParseAndProcessAirdrop parses airdrop data in the format "address=amount" and processes it
