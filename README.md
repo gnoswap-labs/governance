@@ -2,7 +2,7 @@
 
 >:warning: This package is under active development and yet audited for security. Use at your own risk.
 
-This repository contains realms (smart-contracts) for token-based governance on gno.land. Any gno.land-based tokens can use `Airdrop` and 'Snapshot` for distributing tokens, and use `Staker`, `Delegation, and `Governor` for governance. All realms are customizable, meaning they can be used together, or independently. 
+This repository contains realms (smart-contracts) for token-based governance on gno.land. Any gno.land-based tokens can use `Airdrop` and `Snapshot` for distributing tokens, and use `Staker`, `Delegation`, and `Governor` for governance. All realms are customizable, meaning they can be used together, or independently. 
 
 ## Key Components
 
