@@ -1,20 +1,20 @@
-# governance
+# Governance
 
 >:warning: This package is under active development and yet audited for security. Use at your own risk.
 
-The governance system is a comprehensive decentralized solution for managing proposals, voting and executing decisions in a a environment. It is designed to be gno platform.
+This repository contains realms (smart-contracts) for token-based governance on gno.land. Any gno.land-based tokens can use `Airdrop` and 'Snapshot` for distributing tokens, and use `Staker`, `Delegation, and `Governor` for governance. All realms are customizable, meaning they can be used together, or independently. 
 
 ## Key Components
 
-1. **Governor**: Manages the proposal's lifecycle, including creation, voting, and execution. It also handles the governance configuration and upgrade.
+1. **Snapshot**: `Snapshot` provides capturing, storing, and retrieving snapshots of the state of a system at specific points in time, including claimed bitmaps and the number of remaining tokens.
 
-2. **Staker**: Allows users to stake tokens and delegate voting power. It maintains a history of delegation data to support time-weighted voting.
+2. **Airdrop**: `Airdrop` handles token distribution events, including the claiming process and refund if necessary.
 
-3. **Snapshot**: Provides a Cairo's snapshot functionality. It captures the state of the system at specific points in time.
+3. **Staker**: `Staker` allows users to stake tokens and delegate voting power. It maintains a history of delegation data to support time-weighted voting.
 
-4. **Airdrop**: handles token distribution events, including the claiming process and refund if necessary.
+4. **Delegation**: `Delegation` allows token holders to delegate their voting power without transferring token ownership, increasing governance participation flexibility.
 
-5. **Delegation**: Allows token holders to delegate their voting power without transferring token ownership, increasing governance participation flexibility.
+5. **Governor**: `Governor` manages the proposal's lifecycle, including creation, voting, and execution. It also handles the governance configuration and upgrades.
 
 ## System Overview
 
@@ -39,8 +39,11 @@ graph TD
 
 ## Features
 
+- Distribution gno.land based tokens with `Snapshot` and `Airdrop`
+- Creation of a governance system for gno.land based tokens with `Staker`, `Delegation`, and `Governor`
 - Proposal creation and management
 - Configurable governance parameters
+- Providing query functions for delegators such as current delegation, historical delegation, average delegation, and cumulative delegation
 - Upgradable contract design
 
 ## Usage
