@@ -4,11 +4,15 @@ import (
 	"std"
 	"testing"
 
+	"gno.land/p/demo/testutils"
 	"gno.land/p/demo/json"
 	"gno.land/p/demo/ufmt"
 )
 
 func TestParseCallsFromJSON(t *testing.T) {
+	testAddr1 := testutils.TestAddress("test1")
+	testAddr2 := testutils.TestAddress("test2")
+
 	tests := []struct {
 		name    string
 		input   string
@@ -17,10 +21,13 @@ func TestParseCallsFromJSON(t *testing.T) {
 	}{
 		{
 			name:  "Valid single call",
-			input: `[{"to":"g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5","selector":1,"calldata":"test"}]`,
+			input: ufmt.Sprintf(
+				`[{"to":"%s","selector":1,"calldata":"test"}]`,
+				testAddr1.String(),
+			),
 			want: []Call{
 				{
-					To:       std.Address("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5"),
+					To:       testAddr1,
 					Selector: 1,
 					Calldata: "test",
 				},
@@ -29,15 +36,19 @@ func TestParseCallsFromJSON(t *testing.T) {
 		},
 		{
 			name:  "Valid multiple calls",
-			input: `[{"to":"g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5","selector":1,"calldata":"test1"},{"to":"g1sss7jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj","selector":2,"calldata":"test2"}]`,
+			input: ufmt.Sprintf(
+				`[{"to":"%s","selector":1,"calldata":"test1"},{"to":"%s","selector":2,"calldata":"test2"}]`,
+				testAddr1.String(),
+				testAddr2.String(),
+			),
 			want: []Call{
 				{
-					To:       std.Address("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5"),
+					To:       testAddr1,
 					Selector: 1,
 					Calldata: "test1",
 				},
 				{
-					To:       std.Address("g1sss7jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj"),
+					To:       testAddr2,
 					Selector: 2,
 					Calldata: "test2",
 				},
@@ -46,7 +57,7 @@ func TestParseCallsFromJSON(t *testing.T) {
 		},
 		{
 			name:    "Not an array",
-			input:   `{"to":"g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5","selector":1,"calldata":"test"}`,
+			input:   `{"to":"` + testAddr1.String() + `","selector":1,"calldata":"test"}`,
 			want:    nil,
 			wantErr: true,
 		},
