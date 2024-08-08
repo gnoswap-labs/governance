@@ -72,11 +72,3 @@ proposalID := Propose(calls)
 ```go
 Execute(proposalID, calls)
 ```
-
-### License
-
-This project is licensed under the [MIT License](LICENSE).
-
-### Disclaimer
-
-This contract is currently unaudited and in development. Use at your own risk.
