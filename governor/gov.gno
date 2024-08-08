@@ -39,7 +39,6 @@ func Init(staker IStakerDispatcher, config Config) {
 // Propose creates a new proposal with the given set of calls.
 // It checks if the proposer is eligible to create a proposal and if they don't have an active proposal.
 // Returns the proposal ID and an error if the proposal creation fails.
-// TODO: change to use primitive types. (getter/setter)
 func Propose(callsJSON string) (string, error) {
 	if gGovernor == nil {
 		panic("Governor not initialized")
@@ -99,12 +98,12 @@ func Propose(callsJSON string) (string, error) {
 		ConfigVersion: gGovernor.latestConfigVersion,
 	}
 
-	gGovernor.proposals[string(id[:])] = proposal
-	gGovernor.latestProposalByProposer[proposer] = string(id[:])
+	gGovernor.proposals[id] = proposal
+	gGovernor.latestProposalByProposer[proposer] = id
 
 	std.Emit(
 		"Proposed",
-		"id", string(id[:]),
+		"id", id,
 		"proposer", proposer.String(),
 		"calls", ufmt.Sprintf("%v", calls),
 	)
@@ -139,7 +138,7 @@ func Describe(id, description string) {
 	// Emit the Described event
 	std.Emit(
 		"Described",
-		"id", string(id[:]), // Convert byte array to string for event emission
+		"id", id, // Convert byte array to string for event emission
 		"description", description,
 	)
 }
@@ -358,7 +357,7 @@ func Execute(id, callsJSON string) string {
 
 	std.Emit(
 		"Executed",
-		"id", string(id[:]),
+		"id", id,
 	)
 
 	return strings.Join(results, ",")
