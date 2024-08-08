@@ -274,32 +274,43 @@ func TestWithdraw(t *testing.T) {
 
 func TestGetOrigPkgAddrInDifferentRealm(t *testing.T) {
     mockToken := newMockGRC20("Test Token", "TST", 18)
-	delegationContractAddr := testutils.TestAddress("delegationContract")
+    delegationContractAddr := testutils.TestAddress("delegationContract")
     New(testAddr, mockToken, "Test Token", "TST", delegationContractAddr)
 
     userAddr := testutils.TestAddress("user")
     otherRealmAddr := testutils.TestAddress("otherRealm")
 
-    // simulate call stack: user => other realm => delegation contract
-    std.TestSetOrigCaller(userAddr)
-    std.TestSetOrigPkgAddr(otherRealmAddr)
+    // Create realms
+    userRealm := std.NewUserRealm(userAddr)
+    otherRealm := std.NewCodeRealm("gno.land/r/demo/other")
+    delegationRealm := std.NewCodeRealm("gno.land/r/demo/delegation")
 
-    // initial balance and allowance
+    // Set up initial state
+    std.TestSetOrigCaller(userAddr)
+    std.TestSetRealm(userRealm)
+
+    // Initial balance and allowance
     initialBalance := uint64(1000)
     allowance := uint64(500)
     mockToken.balances[userAddr] = initialBalance
     mockToken.Approve(delegationContractAddr, allowance)
 
-    // call Deposit function
+    // Simulate call stack: user => other realm => delegation contract
+    std.TestSetRealm(otherRealm)
+    std.TestSetOrigPkgAddr(otherRealmAddr)
+
+    // Call Deposit function (this should internally use the delegation realm)
     depositAmount := "300"
+    
+    std.TestSetRealm(delegationRealm)
     Deposit(depositAmount, userAddr.String())
 
-    // verify that std.GetOrigPkgAddr() returned the correct address
+    // Verify that std.GetOrigPkgAddr() returned the correct address
     if gDelegatedToken.contractAddr != delegationContractAddr {
         t.Errorf("std.GetOrigPkgAddr() returned %v, want %v", gDelegatedToken.contractAddr.String(), delegationContractAddr.String())
     }
 
-    // verify that the deposit was successful
+    // Verify that the deposit was successful
     expectedBalance := u256.NewUint(300)
     actualBalance := BalanceOf(userAddr.String())
     if actualBalance.Cmp(expectedBalance) != 0 {
