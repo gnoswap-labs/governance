@@ -13,6 +13,7 @@ func lower(c byte) byte {
 	return c | ('x' - 'X')
 }
 
+// TODO: Remove parseUint after gno supports strconv.ParseUint
 func parseUint(s string, base int, bitSize int) (uint64, error) {
 	const fnParseUint = "ParseUint"
 
@@ -157,4 +158,18 @@ func underscoreOK(s string) bool {
 		saw = '!'
 	}
 	return saw != '_'
+}
+
+func b2i(b bool) uint8 {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+func b2s(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
 }

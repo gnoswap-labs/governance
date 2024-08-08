@@ -1,7 +1,6 @@
 package governor
 
 import (
-	"bytes"
 	"errors"
 	"std"
 	"strings"
@@ -57,8 +56,8 @@ func TestPropose(t *testing.T) {
 		VotingStartDelay:              100,
 		VotingPeriod:                  1000,
 		VotingWeightSmoothingDuration: 100,
-		Quorum:                        uint256.NewUint(500),
-		ProposalCreationThreshold:     uint256.NewUint(100),
+		Quorum:                        500,
+		ProposalCreationThreshold:     100,
 		ExecutionDelay:                100,
 		ExecutionWindow:               1000,
 	}
@@ -146,8 +145,8 @@ func TestDescribe(t *testing.T) {
 		VotingStartDelay:              100,
 		VotingPeriod:                  1000,
 		VotingWeightSmoothingDuration: 100,
-		Quorum:                        uint256.NewUint(500),
-		ProposalCreationThreshold:     uint256.NewUint(100),
+		Quorum:                        500,
+		ProposalCreationThreshold:     100,
 		ExecutionDelay:                100,
 		ExecutionWindow:               1000,
 	}
@@ -175,7 +174,7 @@ func TestDescribe(t *testing.T) {
 					errMsg = ufmt.Sprintf("unexpected panic: %v", r)
 				}
 				expectedErrMsg := "DOES_NOT_EXIST"
-				if !bytes.Contains([]byte(errMsg), []byte(expectedErrMsg)) {
+				if errMsg != expectedErrMsg {
 					t.Fatalf("unexpected panic message: %v", errMsg)
 				}
 			} else {
@@ -203,7 +202,7 @@ func TestDescribe(t *testing.T) {
 					errMsg = ufmt.Sprintf("unexpected panic: %v", r)
 				}
 				expectedErrMsg := "ALREADY_EXECUTED"
-				if !bytes.Contains([]byte(errMsg), []byte(expectedErrMsg)) {
+				if errMsg != expectedErrMsg {
 					t.Fatalf("unexpected panic message: %v", errMsg)
 				}
 			} else {
@@ -233,7 +232,7 @@ func TestDescribe(t *testing.T) {
 					errMsg = ufmt.Sprintf("unexpected panic: %v", r)
 				}
 				expectedErrMsg := "PROPOSAL_CANCELED"
-				if !bytes.Contains([]byte(errMsg), []byte(expectedErrMsg)) {
+				if errMsg != expectedErrMsg {
 					t.Fatalf("unexpected panic message: %v", errMsg)
 				}
 			} else {
@@ -254,8 +253,8 @@ func TestProposeAndDescribe(t *testing.T) {
 		VotingStartDelay:              100,
 		VotingPeriod:                  1000,
 		VotingWeightSmoothingDuration: 100,
-		Quorum:                        uint256.NewUint(500),
-		ProposalCreationThreshold:     uint256.NewUint(100),
+		Quorum:                        500,
+		ProposalCreationThreshold:     100,
 		ExecutionDelay:                100,
 		ExecutionWindow:               1000,
 	}
@@ -304,7 +303,7 @@ func TestProposeAndDescribe(t *testing.T) {
 					errMsg = ufmt.Sprintf("unexpected panic: %v", r)
 				}
 				expectedErrMsg := "PROPOSER_HAS_ACTIVE_PROPOSAL"
-				if !bytes.Contains([]byte(errMsg), []byte(expectedErrMsg)) {
+				if errMsg != expectedErrMsg {
 					t.Fatalf("unexpected panic message: %v", errMsg)
 				}
 			} else {
@@ -325,8 +324,8 @@ func TestVote(t *testing.T) {
 		VotingStartDelay:              100,
 		VotingPeriod:                  1000,
 		VotingWeightSmoothingDuration: 100,
-		Quorum:                        uint256.NewUint(500),
-		ProposalCreationThreshold:     uint256.NewUint(100),
+		Quorum:                        500,
+		ProposalCreationThreshold:     100,
 		ExecutionDelay:                100,
 		ExecutionWindow:               1000,
 	}
@@ -432,8 +431,8 @@ func TestCancel(t *testing.T) {
 		VotingStartDelay:              100,
 		VotingPeriod:                  1000,
 		VotingWeightSmoothingDuration: 100,
-		Quorum:                        uint256.NewUint(500),
-		ProposalCreationThreshold:     uint256.NewUint(100),
+		Quorum:                        500,
+		ProposalCreationThreshold:     100,
 		ExecutionDelay:                100,
 		ExecutionWindow:               1000,
 	}
@@ -504,8 +503,8 @@ func TestGetConfigVersion(t *testing.T) {
 		VotingStartDelay:              100,
 		VotingPeriod:                  1000,
 		VotingWeightSmoothingDuration: 100,
-		Quorum:                        uint256.NewUint(500),
-		ProposalCreationThreshold:     uint256.NewUint(100),
+		Quorum:                        500,
+		ProposalCreationThreshold:     100,
 		ExecutionDelay:                100,
 		ExecutionWindow:               1000,
 	}
@@ -536,8 +535,8 @@ func TestGetConfigVersion(t *testing.T) {
 			VotingStartDelay:              200,
 			VotingPeriod:                  2000,
 			VotingWeightSmoothingDuration: 200,
-			Quorum:                        uint256.NewUint(1000),
-			ProposalCreationThreshold:     uint256.NewUint(200),
+			Quorum:                        1000,
+			ProposalCreationThreshold:     200,
 			ExecutionDelay:                200,
 			ExecutionWindow:               2000,
 		}
@@ -552,95 +551,119 @@ func TestGetConfigVersion(t *testing.T) {
 	})
 }
 
-// func TestExecuteCall(t *testing.T) {
-// 	tests := []struct {
-// 		name     string
-// 		selector uint64
-// 		calldata []byte
-// 		register func(uint64)
-// 		expected []byte
-// 		wantErr  bool
-// 	}{
-// 		{
-// 			name:     "Simple concatenation",
-// 			selector: 1,
-// 			calldata: []byte("World"),
-// 			register: func(selector uint64) {
-// 				RegisterFunction(selector, func(data []byte) ([]byte, error) {
-// 					return append([]byte("Hello, "), data...), nil
-// 				})
-// 			},
-// 			expected: []byte("Hello, World"),
-// 			wantErr:  false,
-// 		},
-// 		{
-// 			name:     "Uppercase conversion",
-// 			selector: 2,
-// 			calldata: []byte("lowercase"),
-// 			register: func(selector uint64) {
-// 				RegisterFunction(selector, func(data []byte) ([]byte, error) {
-// 					return bytes.ToUpper(data), nil
-// 				})
-// 			},
-// 			expected: []byte("LOWERCASE"),
-// 			wantErr:  false,
-// 		},
-// 		{
-// 			name:     "Error case",
-// 			selector: 3,
-// 			calldata: []byte("error"),
-// 			register: func(selector uint64) {
-// 				RegisterFunction(selector, func(data []byte) ([]byte, error) {
-// 					return nil, errors.New("mock error")
-// 				})
-// 			},
-// 			expected: nil,
-// 			wantErr:  true,
-// 		},
-// 		{
-// 			name:     "Unregistered function",
-// 			selector: 4,
-// 			calldata: []byte("test"),
-// 			register: func(selector uint64) {
-// 				// Don't register any function
-// 			},
-// 			expected: nil,
-// 			wantErr:  true,
-// 		},
-// 	}
+func TestExecuteCall(t *testing.T) {
+	tests := []struct {
+		name     string
+		selector uint64
+		calldata string
+		register func(uint64)
+		expected string
+		wantErr  bool
+	}{
+		{
+			name:     "Simple concatenation",
+			selector: 1,
+			calldata: "World",
+			register: func(selector uint64) {
+				RegisterFunction(selector, func(args ...string) (string, error) {
+					if len(args) < 1 {
+						return "", errors.New("no data provided")
+					}
+					return "Hello, " + strings.Join(args, " "), nil
+				})
+			},
+			expected: "Hello, World",
+			wantErr:  false,
+		},
+		{
+			name:     "Uppercase conversion",
+			selector: 2,
+			calldata: "lowercase",
+			register: func(selector uint64) {
+				RegisterFunction(selector, func(data ...string) (string, error) {
+					if len(data) < 1 {
+						return "", errors.New("no data provided")
+					}
+					return strings.ToUpper(data[0]), nil
+				})
+			},
+			expected: "LOWERCASE",
+			wantErr:  false,
+		},
+		{
+			name:     "Error case",
+			selector: 3,
+			calldata: "error",
+			register: func(selector uint64) {
+				RegisterFunction(selector, func(data ...string) (string, error) {
+					return "", errors.New("test error")
+				})
+			},
+			expected: "",
+			wantErr:  true,
+		},
+		{
+			name:     "multiple arguments",
+			selector: 4,
+			calldata: "arg1,arg2,arg3",
+			register: func(selector uint64) {
+				RegisterFunction(selector, func(data ...string) (string, error) {
+					if len(data) < 3 {
+						return "", errors.New("not enough arguments")
+					}
+					return strings.Join(data, " "), nil
+				})
+			},
+			expected: "arg1 arg2 arg3",
+			wantErr:  false,
+		},
+		{
+			name:     "Unregistered function",
+			selector: 4,
+			calldata: "test",
+			register: func(selector uint64) {
+				// Don't register any function
+			},
+			expected: "",
+			wantErr:  true,
+		},
+	}
 
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			tt.register(tt.selector)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.register(tt.selector)
 
-// 			call := Call{
-// 				To:       testutils.TestAddress("test_address"),
-// 				Selector: tt.selector,
-// 				Calldata: tt.calldata,
-// 			}
+			call := Call{
+				To:       testutils.TestAddress("test_address"),
+				Selector: tt.selector,
+				Calldata: tt.calldata,
+			}
 
-// 			if tt.wantErr {
-// 				defer func() {
-// 					if r := recover(); r == nil {
-// 						t.Errorf("executeCall() did not panic as expected")
-// 					}
-// 				}()
-// 			}
+			if tt.wantErr {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("executeCall() did not panic as expected")
+					}
+				}()
+			}
 
-// 			result := executeCall(call)
+			result := executeCall(call)
 
-// 			if !tt.wantErr {
-// 				if !bytes.Equal(result, tt.expected) {
-// 					t.Errorf("executeCall() = %v, want %v", result, tt.expected)
-// 				}
-// 			}
-// 		})
-// 	}
-// }
+			if !tt.wantErr {
+				if result != tt.expected {
+					t.Errorf("executeCall() = %s, want %s", result, tt.expected)
+				}
+			}
+		})
+	}
+}
 
 func TestExecute(t *testing.T) {
-	RegisterFunction(1, func(data []byte) ([]byte, error) {
-		return append([]byte("Executed: "), data...), nil
+	RegisterFunction(1, func(args ...string) (string, error) {
+		if len(args) < 1 {
+			return "", errors.New("no data provided")
+		}
+		return "Executed: " + strings.Join(args, " "), nil
 	})
 
 	setupGovernor := func() (string, string, Config) {
@@ -652,8 +675,8 @@ func TestExecute(t *testing.T) {
 			VotingStartDelay:              100,
 			VotingPeriod:                  1000,
 			VotingWeightSmoothingDuration: 100,
-			Quorum:                        uint256.NewUint(500),
-			ProposalCreationThreshold:     uint256.NewUint(100),
+			Quorum:                        500,
+			ProposalCreationThreshold:     100,
 			ExecutionDelay:                100,
 			ExecutionWindow:               1000,
 		}
@@ -734,5 +757,85 @@ func TestExecute(t *testing.T) {
 		}()
 
 		Execute(id, calls)
+	})
+}
+
+func TestReconfigure(t *testing.T) {
+	mockStaker := &MockStaker{}
+	initialConfig := Config{
+		VotingStartDelay:              100,
+		VotingPeriod:                  1000,
+		VotingWeightSmoothingDuration: 100,
+		Quorum:                        500,
+		ProposalCreationThreshold:     100,
+		ExecutionDelay:                100,
+		ExecutionWindow:               1000,
+	}
+	Init(mockStaker, initialConfig)
+
+	// Helper function to set the caller to the governor itself
+	setGovernorAsCaller := func() {
+		origCaller := std.GetOrigCaller
+		std.TestSetOrigCaller(std.GetOrigPkgAddr())
+	}
+
+	t.Run("Successful reconfiguration", func(t *testing.T) {
+		setGovernorAsCaller()
+
+		newConfigJSON := `{
+            "votingStartDelay": 200,
+            "votingPeriod": 2000,
+            "votingWeightSmoothingDuration": 200,
+            "quorum": 1000,
+            "proposalCreationThreshold": 200,
+            "executionDelay": 200,
+            "executionWindow": 2000
+        }`
+
+		newVersion := Reconfigure(newConfigJSON)
+
+		if newVersion != 1 {
+			t.Errorf("Expected new version to be 1, got %d", newVersion)
+		}
+
+		if gGovernor.latestConfigVersion != 1 {
+			t.Errorf("Expected latest config version to be 1, got %d", gGovernor.latestConfigVersion)
+		}
+
+		newConfig := gGovernor.config
+		if newConfig.VotingStartDelay != 200 ||
+			newConfig.VotingPeriod != 2000 ||
+			newConfig.VotingWeightSmoothingDuration != 200 ||
+			newConfig.Quorum != 1000 ||
+			newConfig.ProposalCreationThreshold != 200 ||
+			newConfig.ExecutionDelay != 200 ||
+			newConfig.ExecutionWindow != 2000 {
+			t.Errorf("New configuration does not match expected values")
+		}
+	})
+
+	t.Run("Not called by governor", func(t *testing.T) {
+		// Set the caller to be a different address
+		std.TestSetOrigCaller(testutils.TestAddress("not_governor"))
+
+		newConfigJSON := `{
+	        "votingStartDelay": 200,
+	        "votingPeriod": 2000,
+	        "votingWeightSmoothingDuration": 200,
+	        "quorum": 1000,
+	        "proposalCreationThreshold": 200,
+	        "executionDelay": 200,
+	        "executionWindow": 2000
+	    }`
+
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("The code did not panic")
+			} else if r != "NOT_SELF_CALL" {
+				t.Errorf("Unexpected panic message: %v", r)
+			}
+		}()
+
+		Reconfigure(newConfigJSON)
 	})
 }

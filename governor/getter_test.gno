@@ -22,8 +22,8 @@ func TestGetters(t *testing.T) {
 		VotingStartDelay:              100,
 		VotingPeriod:                  1000,
 		VotingWeightSmoothingDuration: 100,
-		Quorum:                        uint256.NewUint(500),
-		ProposalCreationThreshold:     uint256.NewUint(100),
+		Quorum:                        500,
+		ProposalCreationThreshold:     100,
 		ExecutionDelay:                100,
 		ExecutionWindow:               1000,
 	}
@@ -35,7 +35,7 @@ func TestGetters(t *testing.T) {
 	// 	{
 	// 		To:       std.Address("test_address"),
 	// 		Selector: 1,
-	// 		Calldata: []byte("test_data"),
+	// 		Calldata: "test_data",
 	// 	},
 	// }
 	toAddr := testutils.TestAddress("test_address").String()

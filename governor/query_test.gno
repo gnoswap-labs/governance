@@ -22,7 +22,7 @@ func TestParseCallsFromJSON(t *testing.T) {
 				{
 					To:       std.Address("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5"),
 					Selector: 1,
-					Calldata: []byte("test"),
+					Calldata: "test",
 				},
 			},
 			wantErr: false,
@@ -34,12 +34,12 @@ func TestParseCallsFromJSON(t *testing.T) {
 				{
 					To:       std.Address("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5"),
 					Selector: 1,
-					Calldata: []byte("test1"),
+					Calldata: "test1",
 				},
 				{
 					To:       std.Address("g1sss7jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj"),
 					Selector: 2,
-					Calldata: []byte("test2"),
+					Calldata: "test2",
 				},
 			},
 			wantErr: false,
@@ -79,8 +79,8 @@ func TestParseCallsFromJSON(t *testing.T) {
 					if call.Selector != tt.want[i].Selector {
 						t.Errorf("Call %d: Selector = %v, want %v", i, call.Selector, tt.want[i].Selector)
 					}
-					if string(call.Calldata) != string(tt.want[i].Calldata) {
-						t.Errorf("Call %d: Calldata = %v, want %v", i, string(call.Calldata), string(tt.want[i].Calldata))
+					if call.Calldata != tt.want[i].Calldata {
+						t.Errorf("Call %d: Calldata = %v, want %v", i, call.Calldata, tt.want[i].Calldata)
 					}
 				}
 			}

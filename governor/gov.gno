@@ -69,7 +69,8 @@ func Propose(callsJSON string) (string, error) {
 	if err != nil {
 		panic(err)
 	}
-	if avgDelegated.Cmp(config.ProposalCreationThreshold) < 0 {
+
+	if avgDelegated.Uint64() < config.ProposalCreationThreshold {
 		panic("THRESHOLD")
 	}
 
@@ -265,7 +266,8 @@ func Cancel(id string) {
 		if err != nil {
 			panic("FAILED_TO_GET_AVERAGE_DELEGATED")
 		}
-		if avgDelegated.Cmp(config.ProposalCreationThreshold) >= 0 {
+
+		if avgDelegated.Uint64() >= config.ProposalCreationThreshold {
 			panic("NOT_PROPOSER")
 		}
 	}
@@ -335,7 +337,7 @@ func Execute(id, callsJSON string) string {
 
 	yeaUint := proposal.Yea.Uint64()
 	nayUint := proposal.Nay.Uint64()
-	quorumUint := config.Quorum.Uint64()
+	quorumUint := config.Quorum
 
 	if yeaUint < quorumUint {
 		panic("QUORUM_NOT_MET")
@@ -378,7 +380,9 @@ func executeCall(call Call) string {
 		panic("FUNCTION_NOT_REGISTERED")
 	}
 
-	result, err := fn(call.Calldata)
+	args := strings.Split(call.Calldata, ",")
+
+	result, err := fn(args...)
 	if err != nil {
 		panic("CALL_EXECUTION_FAILED: " + err.Error())
 	}
@@ -405,31 +409,46 @@ func GetConfigVersion(version uint64) Config {
 	return config
 }
 
-// // Reconfigure updates the Governor's configuration.
-// // This function can only be called by the Governor itself (via a proposal).
-// // Returns the new configuration version number.
-// func Reconfigure(newConfig Config) uint64 {
-// 	if gGovernor == nil {
-// 		panic("Governor not initialized")
-// 	}
+// Reconfigure updates the Governor's configuration.
+// This function can only be called by the Governor itself (via a proposal).
+// Returns the new configuration version number.
+func Reconfigure(newConfigJSON string) uint64 {
+	if gGovernor == nil {
+		panic("Governor not initialized")
+	}
 
-// 	checkSelfCall()
-
-// 	gGovernor.latestConfigVersion++
-// 	gGovernor.configVersions[gGovernor.latestConfigVersion] = newConfig
-// 	gGovernor.config = newConfig
-
-// 	// TODO: emit
-
-// 	return gGovernor.latestConfigVersion
-// }
-
-// checkSelfCall ensures that the function is called by the Governor itself.
-// Panics if the caller is not the Governor contract.
-func checkSelfCall() {
+	// ensure called by the Governor itself
 	if std.GetOrigCaller() != std.GetOrigPkgAddr() {
 		panic("NOT_SELF_CALL")
 	}
+
+	newConfigNode, err := json.Unmarshal([]byte(newConfigJSON))
+	if err != nil {
+		panic("invalid confiquration JSON: " + err.Error())
+	}
+
+	newConfig, err := parseConfig(newConfigNode)
+	if err != nil {
+		panic("failed to parse configuration: " + err.Error())
+	}
+
+	gGovernor.latestConfigVersion++
+	gGovernor.configVersions[gGovernor.latestConfigVersion] = newConfig
+	gGovernor.config = newConfig
+
+	std.Emit(
+		"Reconfigured",
+		"version", string(gGovernor.latestConfigVersion),
+		"voting_start_delay", string(newConfig.VotingStartDelay),
+		"voting_period", string(newConfig.VotingPeriod),
+		"voting_weight_smoothing_duration", string(newConfig.VotingWeightSmoothingDuration),
+		"quorum", string(newConfig.Quorum),
+		"proposal_creation_threshold", string(newConfig.ProposalCreationThreshold),
+		"execution_delay", string(newConfig.ExecutionDelay),
+		"execution_window", string(newConfig.ExecutionWindow),
+	)
+
+	return gGovernor.latestConfigVersion
 }
 
 // getProposalID generates a unique proposal ID based on the contract address and nonce
@@ -445,40 +464,4 @@ func getProposalID(address std.Address, nonce uint64) string {
 		buf.WriteString(strconv.FormatInt(int64(b), 16))
 	}
 	return buf.String()
-}
-
-// Call represents a contract call
-type Call struct {
-	To       std.Address
-	Selector uint64
-	Calldata []byte
-}
-
-// hashCalls computes the hash of a list of calls
-
-func hashCalls(calls []Call) string {
-	var buf strings.Builder
-	buf.WriteString("governance::governor::Governor::hash_calls")
-
-	for _, call := range calls {
-		buf.WriteString(string(call.To))
-		buf.WriteString(strconv.FormatUint(call.Selector, 10))
-		buf.Write(call.Calldata)
-	}
-
-	return buf.String()
-}
-
-func b2i(b bool) uint8 {
-	if b {
-		return 1
-	}
-	return 0
-}
-
-func b2s(b bool) string {
-	if b {
-		return "true"
-	}
-	return "false"
 }

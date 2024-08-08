@@ -7,6 +7,7 @@ import (
 
 	"gno.land/p/demo/json"
 	"gno.land/p/demo/ufmt"
+	u256 "gno.land/p/demo/uint256"
 )
 
 // parseCallsFromJSON converts a JSON array of calls into a slice of Call structs.
@@ -89,7 +90,83 @@ func parseCall(node *json.Node) (Call, error) {
 		return Call{}, ufmt.Errorf("'calldata' must be a string")
 	}
 	calldataStr := calldataNode.MustString()
-	call.Calldata = []byte(calldataStr)
+	call.Calldata = calldataStr
 
 	return call, nil
+}
+
+// parseConfig converts a JSON Node representing a config into a Config struct.
+// The input JSON object should have the following structure:
+//
+//	{
+//	  "votingStartDelay": 100,
+//	  "votingPeriod": 1000,
+//	  "votingWeightSmoothingDuration": 100,
+//	  "quorum": "500",
+//	  "proposalCreationThreshold": "100",
+//	  "executionDelay": 100,
+//	  "executionWindow": 1000
+//	}
+//
+// Returns a Config struct and an error if parsing fails.
+func parseConfig(node *json.Node) (Config, error) {
+	if !node.IsObject() {
+		return Config{}, ufmt.Errorf("config must be an object")
+	}
+
+	var config Config
+	var err error
+
+	config.VotingStartDelay, err = parseUint64Field(node, "votingStartDelay")
+	if err != nil {
+		return Config{}, err
+	}
+
+	config.VotingPeriod, err = parseUint64Field(node, "votingPeriod")
+	if err != nil {
+		return Config{}, err
+	}
+
+	config.VotingWeightSmoothingDuration, err = parseUint64Field(node, "votingWeightSmoothingDuration")
+	if err != nil {
+		return Config{}, err
+	}
+
+	config.Quorum, err = parseUint64Field(node, "quorum")
+	if err != nil {
+		return Config{}, err
+	}
+
+	config.ProposalCreationThreshold, err = parseUint64Field(node, "proposalCreationThreshold")
+	if err != nil {
+		return Config{}, err
+	}
+
+	config.ExecutionDelay, err = parseUint64Field(node, "executionDelay")
+	if err != nil {
+		return Config{}, err
+	}
+
+	config.ExecutionWindow, err = parseUint64Field(node, "executionWindow")
+	if err != nil {
+		return Config{}, err
+	}
+
+	return config, nil
+}
+
+func parseUint64Field(node *json.Node, key string) (uint64, error) {
+	fieldName := node.MustKey(key)
+	if !fieldName.IsNumber() {
+		return 0, ufmt.Errorf("'%s' must be a number", key)
+	}
+	return parseUint(fieldName.String(), 10, 64)
+}
+
+func parseStringField(node *json.Node, key string) (string, error) {
+	fieldName := node.MustKey(key)
+	if !fieldName.IsString() {
+		return "", ufmt.Errorf("'%s' must be a string", key)
+	}
+	return fieldName.String(), nil
 }
