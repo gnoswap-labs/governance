@@ -15,8 +15,6 @@ graph TD
     J[Get Config] --> A
     K[Get Votes] --> C
 
-    classDef process fill:#f9f,stroke:#333,stroke-width:2px;
-    classDef decision fill:#bbf,stroke:#333,stroke-width:2px;
     class A,B,D,E,F,G,H,I,J,K process;
     class C decision;
 ```
