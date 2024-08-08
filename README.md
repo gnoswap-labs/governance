@@ -21,20 +21,36 @@ This repository contains realms (smart-contracts) for token-based governance on 
 The following diagram illustrates hw the main components of the governance system interact with each other:
 
 ```mermaid
-graph TD
-    A[User] -->|Interacts| B(Governor)
-    B -->|Manages Proposals| B
-    B -->|Executes Decisions| B
-    B -->|Uses| C(Staker)
-    B -->|Creates/Uses| D(Snapshot)
-    C -->|Manages Stakes| C
-    C -->|Records History| C
-    E[Token Holder] -->|Stakes/Delegates| C
-    F[Airdrop Participant] -->|Claims| G(Airdrop)
-    G -->|Checks Eligibility| D
-    H[Delegator] -->|Delegates Voting Power| I(Delegation)
-    I -->|Updates| C
-    B -->|Checks Voting Power| I
+sequenceDiagram
+    participant U as User
+    participant T as Token Contract
+    participant S as Staker
+    participant D as Delegation
+    participant G as Governor
+    participant SN as Snapshot
+
+    Note over U,SN: 1. Stake
+    U->>T: Approve tokens
+    U->>S: Stake tokens
+    S->>T: Transfer tokens
+    S->>SN: Create stake snapshot
+
+    Note over U,SN: 2. Delegate
+    U->>D: Delegate voting power
+    D->>S: Update delegation info
+    S->>SN: Create delegation snapshot
+
+    Note over U,SN: 3. Governor
+    U->>G: Create proposal
+    G->>SN: Capture proposal state
+    G->>S: Check proposer's stake
+
+    Note over U,SN: 4. Voting
+    U->>G: Cast vote
+    G->>S: Check voter's stake/delegation
+    G->>SN: Record vote
+    G->>G: votes
+    G->>G: Execute proposal (if passed)
 ```
 
 ## Features
