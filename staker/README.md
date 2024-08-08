@@ -74,7 +74,3 @@ graph TD
 
 - The package uses `uint256` for accurate numerical calculations internally. But the outside dApps cannot handle `uint256` directly. Therefo
 re, the package uses primitive type (i.e., `string`) for the outside world.
-
-## License
-
-The staker is licensed under the [MIT License](LICENSE).
