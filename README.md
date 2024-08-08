@@ -39,11 +39,11 @@ graph TD
 
 ## Features
 
-- Distribution gno.land based tokens with `Snapshot` and `Airdrop`
+- Distribution of gno.land based tokens with `Snapshot` and `Airdrop`
 - Creation of a governance system for gno.land based tokens with `Staker`, `Delegation`, and `Governor`
 - Proposal creation and management
 - Configurable governance parameters
-- Providing query functions for delegators such as current delegation, historical delegation, average delegation, and cumulative delegation
+- Providing query functions for delegation such as current delegation, historical delegation, average delegation, and cumulative delegation
 - Upgradable contract design
 
 ## Usage
