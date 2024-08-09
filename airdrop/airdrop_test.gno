@@ -3,6 +3,7 @@ package airdrop
 import (
 	"errors"
 	"std"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,7 +11,7 @@ import (
 	"gno.land/p/demo/merkle"
 	"gno.land/p/demo/testutils"
 	"gno.land/p/demo/ufmt"
-	"gno.land/p/demo/uint256"
+	u256 "gno.land/p/demo/uint256"
 )
 
 var testAddress = testutils.TestAddress("test")
@@ -149,7 +150,7 @@ func TestClaim(t *testing.T) {
 	claim := Claim{
 		ID:      1,
 		Claimee: claimeeAddress,
-		Amount:  uint256.NewUint(100000),
+		Amount:  u256.NewUint(100000),
 	}
 
 	// Test successful claim
@@ -184,7 +185,7 @@ func TestClaim(t *testing.T) {
 	bigClaim := Claim{
 		ID:      2,
 		Claimee: claimeeAddress,
-		Amount:  uint256.NewUint(1000000), // More than the remaining balance
+		Amount:  u256.NewUint(1000000), // More than the remaining balance
 	}
 
 	defer func() {
@@ -213,7 +214,7 @@ func TestClaim64(t *testing.T) {
 		claims[i] = Claim{
 			ID:      uint64(i * 64), // Ensure first claim ID is multiple of 64
 			Claimee: std.Address(ufmt.Sprintf("claimee%d", i)),
-			Amount:  uint256.NewUint(1000), // Each claim is for 1000 tokens
+			Amount:  u256.NewUint(1000), // Each claim is for 1000 tokens
 		}
 	}
 
@@ -247,7 +248,7 @@ func TestClaim64(t *testing.T) {
 		bigClaims[i] = Claim{
 			ID:      uint64((i + 1) * 64),
 			Claimee: std.Address(ufmt.Sprintf("claimee%d", i)),
-			Amount:  uint256.NewUint(20000), // Each claim is for 20000 tokens, which is more than the remaining balance
+			Amount:  u256.NewUint(20000), // Each claim is for 20000 tokens, which is more than the remaining balance
 		}
 	}
 
@@ -387,7 +388,7 @@ func TestAirdropWithSnapshot(t *testing.T) {
 		claims[i] = Claim{
 			ID:      uint64(i * 64), // Ensure first claim ID is multiple of 64
 			Claimee: testutils.TestAddress(ufmt.Sprintf("claimee%d", i)),
-			Amount:  uint256.NewUint(1000), // Each claim is for 1000 tokens
+			Amount:  u256.NewUint(1000), // Each claim is for 1000 tokens
 		}
 	}
 
@@ -442,3 +443,163 @@ func TestAirdropWithSnapshot(t *testing.T) {
 		t.Errorf("Expected remaining tokens %d, got %d", expectedRemainingTokens, snapshot.RemainingTokens)
 	}
 }
+
+func TestParseAirdropData(t *testing.T) {
+	tests := []struct {
+		name           string
+		input          string
+		expectedAddr   string
+		expectedAmount string
+		expectError    bool
+	}{
+		{
+			name:           "Valid input",
+			input:          "g1p3ucd3ptpw902fluyjzhq3ffgq4ntddatev7s5=42027010477582ugnot",
+			expectedAddr:   "g1p3ucd3ptpw902fluyjzhq3ffgq4ntddatev7s5",
+			expectedAmount: "42027010477582",
+			expectError:    false,
+		},
+		{
+			name:           "Valid input without ugnot suffix",
+			input:          "g1p3ucd3ptpw902fluyjzhq3ffgq4ntddatev7s5=42027010477582",
+			expectedAddr:   "g1p3ucd3ptpw902fluyjzhq3ffgq4ntddatev7s5",
+			expectedAmount: "42027010477582",
+			expectError:    false,
+		},
+		{
+			name:        "Invalid format",
+			input:       "invalid_format",
+			expectError: true,
+		},
+		{
+			name:        "Invalid amount",
+			input:       "g1p3ucd3ptpw902fluyjzhq3ffgq4ntddatev7s5=invalid_amount",
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			addr, amount, err := ParseAndProcessAirdrop(tt.input)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected an error, but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+
+				if addr.String() != tt.expectedAddr {
+					t.Errorf("Expected address %s, but got %s", tt.expectedAddr, addr)
+				}
+
+				expectedAmount, _ := u256.FromDecimal(tt.expectedAmount)
+				if amount.Cmp(expectedAmount) != 0 {
+					t.Errorf("Expected amount %s, but got %s", expectedAmount.ToString(), amount.ToString())
+				}
+			}
+		})
+	}
+}
+
+// region airdrop distribution tests
+
+func TestProcessAirdropFile(t *testing.T) {
+	airdropData := `g1p3ucd3ptpw902fluyjzhq3ffgq4ntddatev7s5=42027010477582ugnot
+g14lultfckehtszvzw4ehu0apvsr77afvyy5u50n=35247706217215ugnot
+g15hmqrc245kryaehxlch7scl9d9znxa58n2a3c0=30417901501668ugnot
+g1nm0rrq86ucezaf8uj35pq9fpwr5r82cl5vyaqs=28489219597175ugnot
+g1x54ltnyg88k0ejmk8ytwrhd3ltm84xehs0rn7d=22983213987686ugnot
+g1cj7u0wpe45j0udnsy306sna7peah054uj6h4rj=18441664084402ugnot
+g1z8mzakma7vnaajysmtkwt4wgjqr2m84t3sc2hx=18346174582525ugnot
+g1dtq0y9reqst7d99fd3c7x6dflh4eazm4ypmrpn=16523265241754ugnot`
+
+	expectedResults := make(map[std.Address]*u256.Uint)
+	for _, line := range strings.Split(airdropData, "\n") {
+		addr, amount, err := ParseAndProcessAirdrop(line)
+		if err != nil {
+			t.Fatalf("Error parsing test data: %v", err)
+		}
+		println(ufmt.Sprintf("addr: %s, amount: %s", addr.String(), amount.ToString()))
+		expectedResults[addr] = amount
+	}
+
+	result, err := ProcessAirdropFile(airdropData)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	expectedLength := len(expectedResults)
+	if len(result) != expectedLength {
+		t.Errorf("Expected %d airdrop entries, got %d", expectedLength, len(result))
+	}
+
+	// Check a few specific entries
+	checkEntry := func(addr string, expectedAmount string) {
+		amount, ok := result[std.Address(addr)]
+		if !ok {
+			t.Errorf("Address %s not found in result", addr)
+			return
+		}
+		expected, _ := u256.FromDecimal(expectedAmount)
+		if amount.Cmp(expected) != 0 {
+			t.Errorf("For address %s, expected amount %s, got %s", addr, expected.ToString(), amount.ToString())
+		}
+	}
+
+	checkEntry("g1p3ucd3ptpw902fluyjzhq3ffgq4ntddatev7s5", "42027010477582")
+	checkEntry("g1dtq0y9reqst7d99fd3c7x6dflh4eazm4ypmrpn", "16523265241754")
+
+	for addr, expectedAmount := range expectedResults {
+		actualAmount, ok := result[addr]
+		if !ok {
+			t.Errorf("Address %s not found in result", addr)
+			continue
+		}
+		if actualAmount.Cmp(expectedAmount) != 0 {
+			t.Errorf("For address %s, expected amount %s, got %s", addr, expectedAmount.ToString(), actualAmount.ToString())
+		}
+	}
+}
+
+// func TestAirdropDistribution(t *testing.T) {
+// 	token := NewMockGRC20("Test Token", "TEST", 18)
+
+// 	airdropData := `g1p3ucd3ptpw902fluyjzhq3ffgq4ntddatev7s5=42027010477582ugnot
+// g14lultfckehtszvzw4ehu0apvsr77afvyy5u50n=35247706217215ugnot
+// g15hmqrc245kryaehxlch7scl9d9znxa58n2a3c0=30417901501668ugnot
+// g1nm0rrq86ucezaf8uj35pq9fpwr5r82cl5vyaqs=28489219597175ugnot`
+
+// 	config := Config{
+// 		RefundableTimestamp: 0,
+// 		RefundTo: testutils.TestAddress("refund_to"),
+// 	}
+
+// 	airdropAddr := testutils.TestAddress("airdrop")
+// 	airdrop := NewAirdrop(token, config, airdropAddr)
+
+// 	totalSupply := uint64(1000000000000000)
+// 	token.balances[airdropAddr] = totalSupply
+
+// 	claims, err := ProcessAirdropFile(airdropData)
+// 	if err != nil {
+// 		t.Fatalf("Error processing airdrop data: %v", err)
+// 	}
+
+// 	var counter uint64
+// 	for addr, amount := range claims {
+// 		amount256 := u256.FromDecimal()
+// 		claim := Claim{
+// 			ID: counter,
+// 			Claimee: std.Address(addr),
+// 			Amount: u256.FromDecimal(amount),
+// 		}
+// 		_, err := airdrop.Claim(claim)
+// 		if err != nil {
+// 			t.Fatalf("Error claiming airdrop: %v", err)
+// 		}
+// 		counter += 1
+// 	}
+// }
