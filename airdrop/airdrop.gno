@@ -226,3 +226,24 @@ func ParseAndProcessAirdrop(data string) (address std.Address, amount *u256.Uint
 
 	return address, amount, nil
 }
+
+// ProcessAirdropFile processes the entire airdrop file content
+func ProcessAirdropFile(fileContent string) (map[std.Address]*u256.Uint, error) {
+	lines := strings.Split(fileContent, "\n")
+	result := make(map[std.Address]*u256.Uint)
+
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+
+		address, amount, err := ParseAndProcessAirdrop(line)
+		if err != nil {
+			return nil, ufmt.Errorf("Error processing line '%s': %v", line, err)
+		}
+
+		result[address] = amount
+	}
+
+	return result, nil
+}
