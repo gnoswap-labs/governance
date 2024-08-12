@@ -59,8 +59,4 @@ func main() {
 }
 ```
 
-## License
-
-This package is licensed under the MIT License. See the [LICENSE](LICENSE) file for more information.
-
 [^1]: The bitmap is represented as a map of `uint64` value, where each bit represents a state of specific claim.
