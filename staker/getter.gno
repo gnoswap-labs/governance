@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"gno.land/p/demo/grc/grc20"
+	"gno.land/p/demo/json"
 	u256 "gno.land/p/demo/uint256"
 	"gno.land/p/demo/ufmt"
 )
@@ -35,11 +36,27 @@ func GetDelegationAmount(delegate string) string {
 // GetAllDelegations returns a JSON string of all delegations,
 // with addresses as keys and amounts as values.
 func GetAllDelegations() string {
-	result := make(map[string]string)
+	delegationsArray := json.ArrayNode("", nil)
+
 	for addr, amount := range gStaker.delegations {
-		result[addr.String()] = amount.ToString()
+		delegationObj := json.ObjectNode("", nil)
+		err := delegationObj.AppendObject("address", json.StringNode("address", addr.String()))
+		if err != nil {
+			panic(ufmt.Sprintf("Error appending address to JSON object: %v", err))
+		}
+		err = delegationObj.AppendObject("amount", json.StringNode("amount", amount.ToString()))
+		if err != nil {
+			panic(ufmt.Sprintf("Error appending amount to JSON object: %v", err))
+		}
+		delegationsArray.AppendArray(delegationObj)
 	}
-	return marshalDelegationsJSON(result)
+
+	b, err := json.Marshal(delegationsArray)
+	if err != nil {
+		panic(ufmt.Sprintf("JSON marshal error: %v", err))
+	}
+
+	return string(b)
 }
 
 // GetDelegationHistoryCount returns the number of historical delegation events for a given address.
@@ -77,7 +94,22 @@ func GetDelegationHistory(delegate string, startTime, endTime uint64) string {
 		}
 	}
 
-	return marshalDelegationHistory(relavantHistory)
+	historyNodes := make([]*json.Node, len(relavantHistory))
+	for i, entry := range relavantHistory {
+		historyNodes[i] = json.ObjectNode("", map[string]*json.Node{
+			"timestamp": json.NumberNode("timestamp", float64(entry.timestamp)),
+			"amount":    json.StringNode("amount", entry.amount.ToString()),
+		})
+	}
+
+	node := json.ArrayNode("", historyNodes...)
+
+	b, err := json.Marshal(node)
+	if err != nil {
+		panic(err)
+	}
+
+	return string(b)
 }
 
 func GetRecentDelegationHistory(delegate string, n int) string {
@@ -99,9 +131,24 @@ func GetRecentDelegationHistory(delegate string, n int) string {
 		startIndex = len(history)
 	}
 
-	recentHistroy := history[startIndex:]
+	recentHistory := history[startIndex:]
 
-	return marshalDelegationHistory(recentHistroy)
+	historyNodes := make([]*json.Node, len(recentHistory))
+	for i, entry := range recentHistory {
+		historyNodes[i] = json.ObjectNode("", map[string]*json.Node{
+			"timestamp": json.NumberNode("timestamp", float64(entry.timestamp)),
+			"amount":    json.StringNode("amount", entry.amount.ToString()),
+		})
+	}
+
+	node := json.ArrayNode("", historyNodes...)
+
+	b, err := json.Marshal(node)
+	if err != nil {
+		panic(err)
+	}
+
+	return string(b)
 }
 
 
