@@ -1,10 +1,11 @@
 package airdrop
 
 import (
+	"strconv"
 	"testing"
 
-	"gno.land/p/demo/testutils"
 	"gno.land/p/demo/json"
+	"gno.land/p/demo/testutils"
 	u256 "gno.land/p/demo/uint256"
 )
 
@@ -62,10 +63,8 @@ func TestGetTotalClaims(t *testing.T) {
 }
 
 func TestGetRemainingBalance(t *testing.T) {
-	// Create a mock token
 	mockToken := NewMockGRC20("Test Token", "TST", 18)
 
-	// Create an airdrop instance
 	airdropAddress := testutils.TestAddress("airdrop_address")
 	airdrop := NewAirdrop(mockToken, Config{}, airdropAddress)
 
@@ -137,44 +136,57 @@ func TestGetClaimStatus(t *testing.T) {
 	airdropAddress := testutils.TestAddress("airdrop_address")
 	airdrop := NewAirdrop(mockToken, Config{}, airdropAddress)
 
-	// Test unclaimed status
-	unclaimedID := uint64(1)
-	jsonStr := airdrop.GetClaimStatus(unclaimedID)
-
-	node, err := json.Unmarshal([]byte(jsonStr))
-	if err != nil {
-		t.Fatalf("Failed to unmarshal JSON: %v", err)
+	tests := []struct {
+		name           string
+		claimID        uint64
+		initiallySet   bool
+		expectedStatus bool
+	}{
+		{
+			name:           "Unclaimed ID",
+			claimID:        1,
+			initiallySet:   false,
+			expectedStatus: false,
+		},
+		{
+			name:           "Claimed ID",
+			claimID:        2,
+			initiallySet:   true,
+			expectedStatus: true,
+		},
 	}
 
-	claimID, _ := node.MustKey("claim_id").GetString()
-	if claimID != "1" {
-		t.Errorf("Expected claimID to be 1, but got %v", claimID)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.initiallySet {
+				word, bit := airdrop.claimIDToBitmapIndex(tt.claimID)
+				airdrop.claimedBitmap[word] |= 1 << bit
+			}
 
-	claimed, _ := node.MustKey("claimed").GetBool()
-	if claimed != false {
-		t.Errorf("Expected claimed status to be false, but got %v", claimed)
-	}
+			jsonStr := airdrop.GetClaimStatus(tt.claimID)
 
-	// Simulate a claim
-	claimedID := uint64(2)
-	word, bit := airdrop.claimIDToBitmapIndex(claimedID)
-	airdrop.claimedBitmap[word] |= 1 << bit
+			node, err := json.Unmarshal([]byte(jsonStr))
+			if err != nil {
+				t.Fatalf("Failed to unmarshal JSON: %v", err)
+			}
 
-	jsonStr = airdrop.GetClaimStatus(claimedID)
+			claimID, err := node.MustKey("claim_id").GetString()
+			if err != nil {
+				t.Fatalf("Failed to get claim_id: %v", err)
+			}
 
-	updatedNode, err := json.Unmarshal([]byte(jsonStr))
-	if err != nil {
-		t.Fatalf("Failed to unmarshal JSON: %v", err)
-	}
+			if claimID != strconv.FormatUint(tt.claimID, 10) {
+				t.Errorf("Expected claimID to be %d, but got %v", tt.claimID, claimID)
+			}
 
-	claimID2, _ := updatedNode.MustKey("claim_id").GetString()
-	if claimID2 != "2" {
-		t.Errorf("Expected claimID to be 2, but got %v", claimID2)
-	}
+			claimed, err := node.MustKey("claimed").GetBool()
+			if err != nil {
+				t.Fatalf("Failed to get claimed: %v", err)
+			}
 
-	claimed2, _ := updatedNode.MustKey("claimed").GetBool()
-	if claimed2 != false {
-		t.Errorf("Expected claimed status to be true, but got %v", claimed2)
+			if claimed != tt.expectedStatus {
+				t.Errorf("Expected claimed status to be %v, but got %v", tt.expectedStatus, claimed)
+			}
+		})
 	}
 }
