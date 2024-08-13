@@ -1,6 +1,7 @@
 package airdrop
 
 import (
+	"std"
 	"strconv"
 	"testing"
 
@@ -9,14 +10,20 @@ import (
 	u256 "gno.land/p/demo/uint256"
 )
 
-func TestGetAirdropConfig(t *testing.T) {
+func _setupAirdropConfig(t *testing.T) (*Airdrop, std.Address) {
 	mockToken := NewMockGRC20("Test Token", "TST", 18)
-	refundTo := testutils.TestAddress("refund_to")
+	addr := testutils.TestAddress("addr")
 	config := Config{
 		RefundableTimestamp: 1234567890,
-		RefundTo:            refundTo,
+		RefundTo:            addr,
 	}
-	airdrop := NewAirdrop(mockToken, config, refundTo)
+	airdrop := NewAirdrop(mockToken, config, addr)
+
+	return airdrop, addr
+}
+
+func TestGetAirdropConfig(t *testing.T) {
+	airdrop, refundTo := _setupAirdropConfig(t)
 
 	jsonStr := airdrop.GetAirdropConfig()
 
@@ -34,16 +41,14 @@ func TestGetAirdropConfig(t *testing.T) {
 	if refund != refundTo.String() {
 		t.Errorf("Expected RefundTo to be %s, but got %v", refundTo.String(), refund)
 	}
+
+	if refund != refundTo.String() {
+		t.Errorf("Expected RefundTo to be %s, but got %v", refundTo.String(), refund)
+	}
 }
 
 func TestGetTotalClaims(t *testing.T) {
-	mockToken := NewMockGRC20("Test Token", "TST", 18)
-	refundTo := testutils.TestAddress("refund_to")
-	config := Config{
-		RefundableTimestamp: 1234567890,
-		RefundTo:            refundTo,
-	}
-	ardp := NewAirdrop(mockToken, config, refundTo)
+	ardp, _ := _setupAirdropConfig(t)
 
 	ardp.claimedBitmap[0] = 0b10101010
 	ardp.claimedBitmap[1] = 0b01010101
@@ -97,8 +102,6 @@ func TestGetRemainingBalance(t *testing.T) {
 		)
 	}
 
-	/////////////////////////////////////////////////////////////////////////////////
-
 	// Simulate some claims
 	claimedAmount := uint64(300000)
 	mockToken.balances[airdropAddress] -= claimedAmount
@@ -131,10 +134,7 @@ func TestGetRemainingBalance(t *testing.T) {
 }
 
 func TestGetClaimStatus(t *testing.T) {
-	mockToken := NewMockGRC20("Test Token", "TST", 18)
-
-	airdropAddress := testutils.TestAddress("airdrop_address")
-	airdrop := NewAirdrop(mockToken, Config{}, airdropAddress)
+	airdrop, _ := _setupAirdropConfig(t)
 
 	tests := []struct {
 		name           string
