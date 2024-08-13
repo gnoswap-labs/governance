@@ -18,7 +18,7 @@ import (
 //	  "refundable_timestamp": "1234567890",
 //	  "refund_to": "g1234567890abcdefghijklmnop"
 //	}
-func (a *Airdrop) GetAirdropConfig() string {
+func GetAirdropConfig(a *Airdrop) string {
 	node := json.ObjectNode("", nil)
 
 	timestamp := strconv.FormatUint(a.config.RefundableTimestamp, 10)
@@ -42,7 +42,7 @@ func (a *Airdrop) GetAirdropConfig() string {
 //	{
 //	  "total_claims": "16"
 //	}
-func (a *Airdrop) GetTotalClaims() string {
+func GetTotalClaims(a *Airdrop) string {
 	totalClaims := 0
 	for _, bitmap := range a.claimedBitmap {
 		totalClaims += popCount(bitmap)
@@ -66,7 +66,7 @@ func (a *Airdrop) GetTotalClaims() string {
 //	{
 //	  "remaining_balance": "1000000"
 //	}
-func (a *Airdrop) GetRemainingBalance() string {
+func GetRemainingBalance(a *Airdrop) string {
 	balance := a.token.BalanceOf(a.address)
 
 	node := json.ObjectNode("", nil)
@@ -88,7 +88,7 @@ func (a *Airdrop) GetRemainingBalance() string {
 //	  "claim_id": "123",
 //	  "claimed": true
 //	}
-func (a *Airdrop) GetClaimStatus(claimID uint64) string {
+func GetClaimStatus(a *Airdrop, claimID uint64) string {
 	claimed := a.IsClaimed(claimID)
 
 	node := json.ObjectNode("", nil)

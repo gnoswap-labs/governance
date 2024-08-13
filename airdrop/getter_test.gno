@@ -25,7 +25,7 @@ func _setupAirdropConfig(t *testing.T) (*Airdrop, std.Address) {
 func TestGetAirdropConfig(t *testing.T) {
 	airdrop, refundTo := _setupAirdropConfig(t)
 
-	jsonStr := airdrop.GetAirdropConfig()
+	jsonStr := GetAirdropConfig(airdrop)
 
 	node, err := json.Unmarshal([]byte(jsonStr))
 	if err != nil {
@@ -54,7 +54,7 @@ func TestGetTotalClaims(t *testing.T) {
 	ardp.claimedBitmap[1] = 0b01010101
 	ardp.claimedBitmap[2] = 0b11111111
 
-	jsonStr := ardp.GetTotalClaims()
+	jsonStr := GetTotalClaims(ardp)
 
 	node, err := json.Unmarshal([]byte(jsonStr))
 	if err != nil {
@@ -77,7 +77,7 @@ func TestGetRemainingBalance(t *testing.T) {
 	initialBalance := uint64(1000000)
 	mockToken.balances[airdropAddress] = initialBalance
 
-	jsonStr := airdrop.GetRemainingBalance()
+	jsonStr := GetRemainingBalance(airdrop)
 	node, err := json.Unmarshal([]byte(jsonStr))
 	if err != nil {
 		t.Fatalf("Failed to unmarshal JSON: %v", err)
@@ -106,7 +106,7 @@ func TestGetRemainingBalance(t *testing.T) {
 	claimedAmount := uint64(300000)
 	mockToken.balances[airdropAddress] -= claimedAmount
 
-	jsonStr = airdrop.GetRemainingBalance()
+	jsonStr = GetRemainingBalance(airdrop)
 
 	updatedNode, err := json.Unmarshal([]byte(jsonStr))
 	if err != nil {
@@ -163,7 +163,7 @@ func TestGetClaimStatus(t *testing.T) {
 				airdrop.claimedBitmap[word] |= 1 << bit
 			}
 
-			jsonStr := airdrop.GetClaimStatus(tt.claimID)
+			jsonStr := GetClaimStatus(airdrop, tt.claimID)
 
 			node, err := json.Unmarshal([]byte(jsonStr))
 			if err != nil {
