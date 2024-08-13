@@ -12,156 +12,7 @@ import (
 	u256"gno.land/p/demo/uint256"
 )
 
-// func TestGetters(t *testing.T) {
-// 	// Setup
-	// mockStaker := &MockStaker{
-	// 	averageDelegated: u256.NewUint(1000),
-	// }
-
-	// config := Config{
-	// 	VotingStartDelay:              100,
-	// 	VotingPeriod:                  1000,
-	// 	VotingWeightSmoothingDuration: 100,
-	// 	Quorum:                        500,
-	// 	ProposalCreationThreshold:     100,
-	// 	ExecutionDelay:                100,
-	// 	ExecutionWindow:               1000,
-	// }
-
-	// Init(mockStaker, config)
-
-// 	// Create a test proposal
-// 	// calls := []Call{
-// 	// 	{
-// 	// 		To:       std.Address("test_address"),
-// 	// 		Selector: 1,
-// 	// 		Calldata: "test_data",
-// 	// 	},
-// 	// }
-// 	toAddr := testutils.TestAddress("test_address").String()
-// 	callsJSON := ufmt.Sprintf(
-// 		`[{"to":"%s","selector":1,"calldata":"test_data"}]`,
-// 		toAddr,
-// 	)
-// 	id, _ := Propose(callsJSON)
-
-// 	// Test GetStaker
-// 	t.Run("GetStaker", func(t *testing.T) {
-// 		staker := GetStaker()
-// 		if staker != mockStaker {
-// 			t.Errorf("GetStaker() = %v, want %v", staker, mockStaker)
-// 		}
-// 	})
-
-// 	// Test GetConfig
-// 	t.Run("GetConfig", func(t *testing.T) {
-// 		gotConfig := GetConfig()
-// 		if gotConfig != config {
-// 			t.Errorf("GetConfig() = %v, want %v", gotConfig, config)
-// 		}
-// 	})
-
-// 	// Test GetConfigWithVersion
-// 	t.Run("GetConfigWithVersion", func(t *testing.T) {
-// 		gotConfig, gotVersion := GetConfigWithVersion()
-// 		if gotConfig != config {
-// 			t.Errorf("GetConfigWithVersion() config = %v, want %v", gotConfig, config)
-// 		}
-// 		if gotVersion != 0 {
-// 			t.Errorf("GetConfigWithVersion() version = %v, want 0", gotVersion)
-// 		}
-// 	})
-
-// 	// Test GetProposal
-// 	t.Run("GetProposal", func(t *testing.T) {
-// 		proposal := GetProposal(id)
-
-// 		callsNode, err := json.Unmarshal([]byte(callsJSON))
-// 		if err != nil {
-// 			panic(ufmt.Sprintf("failed to unmarshal calls JSON: %v", err))
-// 		}
-
-// 		calls, err := parseCallsFromJSON(callsNode)
-// 		if err != nil {
-// 			t.Errorf("parseCallsFromJSON() error = %v", err)
-// 		}
-
-// 		if proposal.CallsHash != hashCalls(calls) {
-// 			t.Errorf("GetProposal() CallsHash mismatch")
-// 		}
-// 		if proposal.Proposer != std.GetOrigCaller() {
-// 			t.Errorf("GetProposal() Proposer = %v, want %v", proposal.Proposer, std.GetOrigCaller())
-// 		}
-// 	})
-
-// 	// Test GetProposalWithConfig
-// 	t.Run("GetProposalWithConfig", func(t *testing.T) {
-// 		proposal, gotConfig := GetProposalWithConfig(id)
-
-// 		callsNode, err := json.Unmarshal([]byte(callsJSON))
-// 		if err != nil {
-// 			panic(ufmt.Sprintf("failed to unmarshal calls JSON: %v", err))
-// 		}
-
-// 		calls, err := parseCallsFromJSON(callsNode)
-// 		if err != nil {
-// 			t.Errorf("parseCallsFromJSON() error = %v", err)
-// 		}
-
-// 		if proposal.CallsHash != hashCalls(calls) {
-// 			t.Errorf("GetProposalWithConfig() CallsHash mismatch")
-// 		}
-// 		if gotConfig != config {
-// 			t.Errorf("GetProposalWithConfig() config = %v, want %v", gotConfig, config)
-// 		}
-// 	})
-
-// 	// Test GetVote
-// 	t.Run("GetVote", func(t *testing.T) {
-// 		voter := std.GetOrigCaller()
-
-// 		// Before voting
-// 		vote := GetVote(id, voter)
-// 		if vote != 0 {
-// 			t.Errorf("GetVote() before voting = %v, want 0", vote)
-// 		}
-
-// 		// Set the time to be after voting has started
-// 		proposal := gGovernor.proposals[id]
-// 		votingStartTime := proposal.ExecutionState.Created + config.VotingStartDelay + 1
-// 		origTimeNow := timeNow
-// 		timeNow = func() time.Time { return time.Unix(int64(votingStartTime), 0) }
-// 		defer func() { timeNow = origTimeNow }()
-
-// 		// After voting
-// 		Vote(id, true)
-// 		vote = GetVote(id, voter)
-// 		if vote != 3 {
-// 			t.Errorf("GetVote() after voting yes = %v, want 3", vote)
-// 		}
-// 	})
-
-// 	// Test error cases
-// 	t.Run("GetProposal non-existent", func(t *testing.T) {
-// 		defer func() {
-// 			if r := recover(); r == nil {
-// 				t.Errorf("GetProposal() with non-existent ID did not panic")
-// 			}
-// 		}()
-// 		GetProposal("")
-// 	})
-
-// 	t.Run("GetProposalWithConfig non-existent", func(t *testing.T) {
-// 		defer func() {
-// 			if r := recover(); r == nil {
-// 				t.Errorf("GetProposalWithConfig() with non-existent ID did not panic")
-// 			}
-// 		}()
-// 		GetProposalWithConfig("")
-// 	})
-// }
-
-func TestGetConfig(t *testing.T) {
+func _setupTestConfig(t *testing.T) {
 	testConfig := Config{
 		VotingStartDelay:              100,
 		VotingPeriod:                  200,
@@ -176,42 +27,81 @@ func TestGetConfig(t *testing.T) {
 	}
 
 	Init(mockStaker, testConfig)
+}
+
+func TestGetConfig(t *testing.T) {
+	_setupTestConfig(t)
 
 	jsonStr := GetConfig()
 
-	expectedJSON := `{"VotingStartDelay":100,"VotingPeriod":200,"VotingWeightSmoothingDuration":300,"Quorum":400,"ProposalCreationThreshold":500,"ExecutionDelay":600,"ExecutionWindow":700}`
-	if jsonStr != expectedJSON {
-		t.Errorf("GetConfig() = %v, want %v", jsonStr, expectedJSON)
-	}
-
-	// testing purpose (just to see the output)
 	node, err := json.Unmarshal([]byte(jsonStr))
 	if err != nil {
 		t.Fatalf("Failed to unmarshal JSON: %v", err)
 	}
 
-	println(node.String())
+	votingStartDelay, err := node.MustKey("VotingStartDelay").Value()
+	if err != nil {
+		t.Fatalf("Failed to get VotingStartDelay: %v", err)
+	}
+	if votingStartDelay != float64(100) {
+		t.Errorf("Expected VotingStartDelay to be 100, but got %v", votingStartDelay)
+	}
+
+	votingPeriod, err := node.MustKey("VotingPeriod").Value()
+	if err != nil {
+		t.Fatalf("Failed to get VotingPeriod: %v", err)
+	}
+	if votingPeriod != float64(200) {
+		t.Errorf("Expected VotingPeriod to be 200, but got %v", votingPeriod)
+	}
+
+	votingWeightSmoothingDuration, err := node.MustKey("VotingWeightSmoothingDuration").Value()
+	if err != nil {
+		t.Fatalf("Failed to get VotingWeightSmoothingDuration: %v", err)
+	}
+	if votingWeightSmoothingDuration != float64(300) {
+		t.Errorf("Expected VotingWeightSmoothingDuration to be 300, but got %v", votingWeightSmoothingDuration)
+	}
+
+	quorum, err := node.MustKey("Quorum").Value()
+	if err != nil {
+		t.Fatalf("Failed to get Quorum: %v", err)
+	}
+	if quorum != float64(400) {
+		t.Errorf("Expected Quorum to be 400, but got %v", quorum)
+	}
+
+	proposalCreationThreshold, err := node.MustKey("ProposalCreationThreshold").Value()
+	if err != nil {
+		t.Fatalf("Failed to get ProposalCreationThreshold: %v", err)
+	}
+	if proposalCreationThreshold != float64(500) {
+		t.Errorf("Expected ProposalCreationThreshold to be 500, but got %v", proposalCreationThreshold)
+	}
+
+	executionDelay, err := node.MustKey("ExecutionDelay").Value()
+	if err != nil {
+		t.Fatalf("Failed to get ExecutionDelay: %v", err)
+	}
+	if executionDelay != float64(600) {
+		t.Errorf("Expected ExecutionDelay to be 600, but got %v", executionDelay)
+	}
+
+	executionWindow, err := node.MustKey("ExecutionWindow").Value()
+	if err != nil {
+		t.Fatalf("Failed to get ExecutionWindow: %v", err)
+	}
+	if executionWindow != float64(700) {
+		t.Errorf("Expected ExecutionWindow to be 700, but got %v", executionWindow)
+	}
 }
 
 func TestConfigWithVersion(t *testing.T) {
-	testConfig := Config{
-		VotingStartDelay:              100,
-		VotingPeriod:                  200,
-		VotingWeightSmoothingDuration: 300,
-		Quorum:                        400,
-		ProposalCreationThreshold:     500,
-		ExecutionDelay:                600,
-		ExecutionWindow:               700,
-	}
-	mockStaker := &MockStaker{
-		averageDelegated: u256.NewUint(1000),
-	}
-
-	Init(mockStaker, testConfig)
+	_setupTestConfig(t)
 
 	jsonStr := GetConfigWithVersion()
 
-	expectedJSON := `{"config":"{\"VotingStartDelay\":100,\"VotingPeriod\":200,\"VotingWeightSmoothingDuration\":300,\"Quorum\":400,\"ProposalCreationThreshold\":500,\"ExecutionDelay\":600,\"ExecutionWindow\":700}","version":0}`
+	expectedJSON := `{"config":{"VotingStartDelay":100,"VotingPeriod":200,"VotingWeightSmoothingDuration":300,"Quorum":400,"ProposalCreationThreshold":500,"ExecutionDelay":600,"ExecutionWindow":700},"version":0}`
 	if jsonStr != expectedJSON {
 		t.Errorf("GetConfigWithVersion() = %v, want %v", jsonStr, expectedJSON)
 	}
@@ -225,20 +115,7 @@ func TestConfigWithVersion(t *testing.T) {
 }
 
 func TestGetProposal(t *testing.T) {
-	mockStaker := &MockStaker{
-		averageDelegated: u256.NewUint(1000),
-	}
-	config := Config{
-		VotingStartDelay:              100,
-		VotingPeriod:                  200,
-		VotingWeightSmoothingDuration: 300,
-		Quorum:                        400,
-		ProposalCreationThreshold:     500,
-		ExecutionDelay:                600,
-		ExecutionWindow:               700,
-	}
-
-	Init(mockStaker, config)
+	_setupTestConfig(t)
 
 	testProposalID := "test_proposal_1"
 	testProposer := testutils.TestAddress("test_proposer")
@@ -270,5 +147,90 @@ func TestGetProposal(t *testing.T) {
 
 	if node.String() != expectedJSON {
 		t.Errorf("GetProposal() = %v, want %v", node.String(), expectedJSON)
+	}
+}
+
+func TestGetProposalWithConfig(t *testing.T) {
+	_setupTestConfig(t)
+
+	testProposalID := "test_proposal_1"
+	testProposer := testutils.TestAddress("test_proposer")
+
+	testProposal := ProposalInfo{
+		CallsHash: "test_calls_hash",
+		Proposer:  testProposer,
+		ExecutionState: ExecutionState{
+			Created:  1000,
+			Executed: 0,
+			Canceled: 0,
+		},
+		Yea:           u256.NewUint(1000),
+		Nay:           u256.NewUint(500),
+		ConfigVersion: 1,
+	}
+
+	gGovernor.proposals[testProposalID] = testProposal
+
+	jsonStr := GetProposalWithConfig(testProposalID)
+	expectedJSON := `{"config":{"VotingStartDelay":100,"VotingPeriod":200,"VotingWeightSmoothingDuration":300,"Quorum":400,"ProposalCreationThreshold":500,"ExecutionDelay":600,"ExecutionWindow":700},"proposal":{"call_hash":"test_calls_hash","proposer":"g1w3jhxazlwpex7ur0wdjhyh6lta047h6l7atze0","execution_state":{"created":1000,"executed":0,"canceled":0},"yea":1000,"nay":500,"config_version":1}}`
+	if jsonStr != expectedJSON {
+		t.Errorf("GetProposalWithConfig() = %v, want %v", jsonStr, expectedJSON)
+	}
+
+	node, err := json.Unmarshal([]byte(jsonStr))
+	if err != nil {
+		t.Fatalf("Failed to unmarshal JSON: %v", err)
+	}
+
+	keys := node.UniqueKeyLists()
+	if len(keys) != 18 {
+		t.Fatalf("Expected 18 keys, but got %v", len(keys))
+	}
+
+	println(keys)
+}
+
+func TestGetVote(t *testing.T) {
+	_setupTestConfig(t)
+
+	testProposalID := "test_proposal_1"
+	testVoter := testutils.TestAddress("test_voter")
+	gGovernor.vote[testProposalID] = make(map[std.Address]uint8)
+	gGovernor.vote[testProposalID][testVoter] = 3 // Voted in favor
+
+	jsonStr := GetVote(testProposalID, testVoter)
+
+	node, err := json.Unmarshal([]byte(jsonStr))
+	if err != nil {
+		t.Fatalf("Failed to unmarshal JSON: %v", err)
+	}
+
+	keys := node.UniqueKeyLists()
+	if len(keys) != 3 {
+		t.Fatalf("Expected 3 keys, but got %v", len(keys))
+	}
+
+	id, err := node.MustKey("id").Value()
+	if err != nil {
+		t.Fatalf("Failed to get id: %v", err)
+	}
+	if id != testProposalID {
+		t.Errorf("Expected id to be '%s', but got %v", testProposalID, id)
+	}
+
+	voter, err := node.MustKey("voter").Value()
+	if err != nil {
+		t.Fatalf("Failed to get voter: %v", err)
+	}
+	if voter != testVoter.String() {
+		t.Errorf("Expected voter to be '%s', but got %v", testVoter.String(), voter)
+	}
+
+	vote, err := node.MustKey("vote").Value()
+	if err != nil {
+		t.Fatalf("Failed to get vote: %v", err)
+	}
+	if vote != float64(3) {
+		t.Errorf("Expected vote to be 3, but got %v", vote)
 	}
 }

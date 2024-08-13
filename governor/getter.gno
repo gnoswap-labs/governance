@@ -8,9 +8,9 @@ import (
 	"gno.land/p/demo/ufmt"
 )
 
-// TODO: Change returns to primitive types
-
 // GetStaker returns the address of the staker contract used by this governor.
+//
+// TODO: Should be done after what data to be included.
 func GetStaker() IStakerDispatcher {
 	if gGovernor == nil {
 		panic("governor not initialized")
@@ -74,7 +74,11 @@ func GetConfigWithVersion() string {
 
 	configWithVersionNode := json.ObjectNode("", nil)
 
-	err := configWithVersionNode.AppendObject("config", json.StringNode("config", GetConfig()))
+	node, err := json.Unmarshal([]byte(GetConfig()))
+	if err != nil {
+		panic(ufmt.Sprintf("Failed to unmarshal JSON: %v", err))
+	}
+	err = configWithVersionNode.AppendObject("config", node)
 	if err != nil {
 		panic(ufmt.Sprintf("Error appending to JSON object: %v", err))
 	}
@@ -156,33 +160,39 @@ func GetProposal(id string) string {
 	return string(b)
 }
 
-// func GetProposal(id string) ProposalInfo {
-// 	if gGovernor == nil {
-// 		panic("governor not initialized")
-// 	}
-
-// 	prop, exists := gGovernor.proposals[id]
-// 	if !exists {
-// 		panic("proposal not found")
-// 	}
-
-// 	return prop
-// }
-
 // GetProposalWithConfig returns the information for a specific proposal along with the configuration
-// that was in effect when the proposal was created.
-func GetProposalWithConfig(id string) (ProposalInfo, Config) {
+// that was in effect when the proposal was created in a JSON string.
+func GetProposalWithConfig(id string) string {
 	if gGovernor == nil {
 		panic("governor not initialized")
 	}
 
-	prop, exists := gGovernor.proposals[id]
-	if !exists {
-		panic("proposal not found")
+	configNode, err := json.Unmarshal([]byte(GetConfig()))
+	if err != nil {
+		panic(ufmt.Sprintf("Failed to unmarshal JSON: %v", err))
 	}
 
-	config := GetConfigVersion(prop.ConfigVersion)
-	return prop, config
+	propNode, err := json.Unmarshal([]byte(GetProposal(id)))
+	if err != nil {
+		panic(ufmt.Sprintf("Failed to unmarshal JSON: %v", err))
+	}
+
+	mergedNode := json.ObjectNode("", nil)
+	err = mergedNode.AppendObject("config", configNode)
+	if err != nil {
+		panic(ufmt.Sprintf("Error appending to JSON object: %v", err))
+	}
+	err = mergedNode.AppendObject("proposal", propNode)
+	if err != nil {
+		panic(ufmt.Sprintf("Error appending to JSON object: %v", err))
+	}
+
+	b, err := json.Marshal(mergedNode)
+	if err != nil {
+		panic(ufmt.Sprintf("JSON marshal error: %v", err))
+	}
+
+	return string(b)
 }
 
 // GetVote returns the vote cast by a specific voter for a specific proposal.
@@ -190,15 +200,36 @@ func GetProposalWithConfig(id string) (ProposalInfo, Config) {
 // 0 - Not voted
 // 1 - Voted against
 // 3 - Voted in favor
-func GetVote(id string, voter std.Address) uint8 {
+func GetVote(id string, voter std.Address) string {
 	if gGovernor == nil {
 		panic("governor not initialized")
 	}
 
+	voteValue := uint8(0) // Default: Not voted
 	votes, exists := gGovernor.vote[id]
-	if !exists {
-		return 0 // Not voted
+	if exists {
+		voteValue = votes[voter]
 	}
 
-	return votes[voter]
+	voteNode := json.ObjectNode("", nil)
+
+	err := voteNode.AppendObject("id", json.StringNode("id", id))
+	if err != nil {
+		panic(ufmt.Sprintf("Error appending to JSON object: %v", err))
+	}
+	err = voteNode.AppendObject("voter", json.StringNode("voter", voter.String()))
+	if err != nil {
+		panic(ufmt.Sprintf("Error appending to JSON object: %v", err))
+	}
+	err = voteNode.AppendObject("vote", json.NumberNode("vote", float64(voteValue)))
+	if err != nil {
+		panic(ufmt.Sprintf("Error appending to JSON object: %v", err))
+	}
+
+	b, err := json.Marshal(voteNode)
+	if err != nil {
+		panic(ufmt.Sprintf("JSON marshal error: %v", err))
+	}
+
+	return string(b)
 }
