@@ -25,9 +25,10 @@ func _setupAirdropConfig(t *testing.T) (*Airdrop, std.Address) {
 func TestGetAirdropConfig(t *testing.T) {
 	airdrop, refundTo := _setupAirdropConfig(t)
 
-	jsonStr := GetAirdropConfig(airdrop)
+	jsonStr := AirdropToJSON(airdrop)
+	result := GetAirdropConfig(jsonStr)
 
-	node, err := json.Unmarshal([]byte(jsonStr))
+	node, err := json.Unmarshal([]byte(result))
 	if err != nil {
 		t.Fatalf("Failed to unmarshal JSON: %v", err)
 	}
@@ -54,9 +55,11 @@ func TestGetTotalClaims(t *testing.T) {
 	ardp.claimedBitmap[1] = 0b01010101
 	ardp.claimedBitmap[2] = 0b11111111
 
-	jsonStr := GetTotalClaims(ardp)
+	jsonStr := AirdropToJSON(ardp)
 
-	node, err := json.Unmarshal([]byte(jsonStr))
+	result := GetTotalClaims(jsonStr)
+
+	node, err := json.Unmarshal([]byte(result))
 	if err != nil {
 		t.Fatalf("Failed to unmarshal JSON: %v", err)
 	}
@@ -77,13 +80,15 @@ func TestGetRemainingBalance(t *testing.T) {
 	initialBalance := uint64(1000000)
 	mockToken.balances[airdropAddress] = initialBalance
 
-	jsonStr := GetRemainingBalance(airdrop)
+	airdropJSON := AirdropToJSON(airdrop)
+
+	jsonStr := GetRemainingBalance(airdropJSON)
 	node, err := json.Unmarshal([]byte(jsonStr))
 	if err != nil {
 		t.Fatalf("Failed to unmarshal JSON: %v", err)
 	}
 
-	remainingBalance, _ := node.MustKey("remaining_balance").GetString()
+	remainingBalance := node.MustKey("remaining_balance").MustString()
 	if remainingBalance != "1000000" {
 		t.Errorf("Expected remaining balance to be 1000000, but got %v", remainingBalance)
 	}
@@ -106,14 +111,17 @@ func TestGetRemainingBalance(t *testing.T) {
 	claimedAmount := uint64(300000)
 	mockToken.balances[airdropAddress] -= claimedAmount
 
-	jsonStr = GetRemainingBalance(airdrop)
+	// Update airdrop JSON
+	airdropJSON = AirdropToJSON(airdrop)
+
+	jsonStr = GetRemainingBalance(airdropJSON)
 
 	updatedNode, err := json.Unmarshal([]byte(jsonStr))
 	if err != nil {
 		t.Fatalf("Failed to unmarshal updated JSON: %v", err)
 	}
 
-	updatedRemainingBalance, _ := updatedNode.MustKey("remaining_balance").GetString()
+	updatedRemainingBalance := updatedNode.MustKey("remaining_balance").MustString()
 	if updatedRemainingBalance != "700000" {
 		t.Errorf("Expected updated remaining balance to be 700000, but got %v", updatedRemainingBalance)
 	}
@@ -163,9 +171,10 @@ func TestGetClaimStatus(t *testing.T) {
 				airdrop.claimedBitmap[word] |= 1 << bit
 			}
 
-			jsonStr := GetClaimStatus(airdrop, tt.claimID)
+			jsonStr := AirdropToJSON(airdrop)
+			res := GetClaimStatus(jsonStr, tt.claimID)
 
-			node, err := json.Unmarshal([]byte(jsonStr))
+			node, err := json.Unmarshal([]byte(res))
 			if err != nil {
 				t.Fatalf("Failed to unmarshal JSON: %v", err)
 			}
@@ -192,75 +201,75 @@ func TestGetClaimStatus(t *testing.T) {
 }
 
 func TestAirdropToJSONAndCreateAirdropFromJSON(t *testing.T) {
-    mockToken := NewMockGRC20("Test Token", "TST", 18)
-    airdropAddress := testutils.TestAddress("airdrop_address")
-    refundTo := testutils.TestAddress("refund_to")
-    config := Config{
-        RefundableTimestamp: 1234567890,
-        RefundTo:            refundTo,
-    }
-    airdrop := NewAirdrop(mockToken, config, airdropAddress)
+	mockToken := NewMockGRC20("Test Token", "TST", 18)
+	airdropAddress := testutils.TestAddress("airdrop_address")
+	refundTo := testutils.TestAddress("refund_to")
+	config := Config{
+		RefundableTimestamp: 1234567890,
+		RefundTo:            refundTo,
+	}
+	airdrop := NewAirdrop(mockToken, config, airdropAddress)
 
-    // Set some claimed bits
-    airdrop.claimedBitmap[0] = 0b101
-    airdrop.claimedBitmap[1] = 0b11010
+	// Set some claimed bits
+	airdrop.claimedBitmap[0] = 0b101
+	airdrop.claimedBitmap[1] = 0b11010
 
-    jsonStr := airdropToJSON(airdrop)
-    newAirdrop := createAirdropFromJSON(jsonStr)
+	jsonStr := AirdropToJSON(airdrop)
+	newAirdrop := createAirdropFromJSON(jsonStr)
 
-    if newAirdrop.config.RefundableTimestamp != airdrop.config.RefundableTimestamp {
-        t.Errorf("RefundableTimestamp mismatch. Expected %d, got %d", 
-            airdrop.config.RefundableTimestamp, newAirdrop.config.RefundableTimestamp)
-    }
+	if newAirdrop.config.RefundableTimestamp != airdrop.config.RefundableTimestamp {
+		t.Errorf("RefundableTimestamp mismatch. Expected %d, got %d",
+			airdrop.config.RefundableTimestamp, newAirdrop.config.RefundableTimestamp)
+	}
 
-    if newAirdrop.config.RefundTo != airdrop.config.RefundTo {
-        t.Errorf("RefundTo mismatch. Expected %s, got %s", 
-            airdrop.config.RefundTo, newAirdrop.config.RefundTo)
-    }
+	if newAirdrop.config.RefundTo != airdrop.config.RefundTo {
+		t.Errorf("RefundTo mismatch. Expected %s, got %s",
+			airdrop.config.RefundTo, newAirdrop.config.RefundTo)
+	}
 
-    if newAirdrop.address != airdrop.address {
-        t.Errorf("Address mismatch. Expected %s, got %s", 
-            airdrop.address, newAirdrop.address)
-    }
+	if newAirdrop.address != airdrop.address {
+		t.Errorf("Address mismatch. Expected %s, got %s",
+			airdrop.address, newAirdrop.address)
+	}
 
-    if len(newAirdrop.claimedBitmap) != len(airdrop.claimedBitmap) {
-        t.Errorf("ClaimedBitmap length mismatch. Expected %d, got %d", 
-            len(airdrop.claimedBitmap), len(newAirdrop.claimedBitmap))
-    }
+	if len(newAirdrop.claimedBitmap) != len(airdrop.claimedBitmap) {
+		t.Errorf("ClaimedBitmap length mismatch. Expected %d, got %d",
+			len(airdrop.claimedBitmap), len(newAirdrop.claimedBitmap))
+	}
 
-    for k, v := range airdrop.claimedBitmap {
-        if newAirdrop.claimedBitmap[k] != v {
-            t.Errorf("ClaimedBitmap mismatch for key %d. Expected %d, got %d", 
-                k, v, newAirdrop.claimedBitmap[k])
-        }
-    }
+	for k, v := range airdrop.claimedBitmap {
+		if newAirdrop.claimedBitmap[k] != v {
+			t.Errorf("ClaimedBitmap mismatch for key %d. Expected %d, got %d",
+				k, v, newAirdrop.claimedBitmap[k])
+		}
+	}
 
-    root, err := json.Unmarshal([]byte(jsonStr))
-    if err != nil {
-        t.Fatalf("Failed to unmarshal JSON: %v", err)
-    }
+	root, err := json.Unmarshal([]byte(jsonStr))
+	if err != nil {
+		t.Fatalf("Failed to unmarshal JSON: %v", err)
+	}
 
-    configNode := root.MustKey("config")
+	configNode := root.MustKey("config")
 
-    if configNode.MustKey("refundable_timestamp").MustString() != "1234567890" {
-        t.Errorf("RefundableTimestamp mismatch in JSON. Expected 1234567890, got %s", 
-            configNode.MustKey("refundable_timestamp").MustString())
-    }
+	if configNode.MustKey("refundable_timestamp").MustString() != "1234567890" {
+		t.Errorf("RefundableTimestamp mismatch in JSON. Expected 1234567890, got %s",
+			configNode.MustKey("refundable_timestamp").MustString())
+	}
 
-    if configNode.MustKey("refund_to").MustString() != refundTo.String() {
-        t.Errorf("RefundTo mismatch in JSON. Expected %s, got %s", 
-            refundTo.String(), configNode.MustKey("refund_to").MustString())
-    }
+	if configNode.MustKey("refund_to").MustString() != refundTo.String() {
+		t.Errorf("RefundTo mismatch in JSON. Expected %s, got %s",
+			refundTo.String(), configNode.MustKey("refund_to").MustString())
+	}
 
-    claimedBitmapNode := root.MustKey("claimed_bitmap")
+	claimedBitmapNode := root.MustKey("claimed_bitmap")
 
-    if claimedBitmapNode.MustKey("0").MustString() != "101" {
-        t.Errorf("ClaimedBitmap[0] mismatch in JSON. Expected 5 (101), got %s", 
-            claimedBitmapNode.MustKey("0").MustString())
-    }
+	if claimedBitmapNode.MustKey("0").MustString() != "101" {
+		t.Errorf("ClaimedBitmap[0] mismatch in JSON. Expected 5 (101), got %s",
+			claimedBitmapNode.MustKey("0").MustString())
+	}
 
-    if claimedBitmapNode.MustKey("1").MustString() != "11010" {
-        t.Errorf("ClaimedBitmap[1] mismatch in JSON. Expected 26 (11010), got %s", 
-            claimedBitmapNode.MustKey("1").MustString())
-    }
+	if claimedBitmapNode.MustKey("1").MustString() != "11010" {
+		t.Errorf("ClaimedBitmap[1] mismatch in JSON. Expected 26 (11010), got %s",
+			claimedBitmapNode.MustKey("1").MustString())
+	}
 }
