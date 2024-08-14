@@ -102,7 +102,12 @@ func GetProposal(id string) string {
 		panic("governor not initialized")
 	}
 
-	prop, exists := gGovernor.proposals[id]
+	proposalValue, exists := gGovernor.proposals.Get(id)
+	if !exists {
+		panic("proposal not found")
+	}
+
+	prop := proposalValue.(ProposalInfo)
 	if !exists {
 		panic("proposal not found")
 	}
@@ -200,15 +205,24 @@ func GetProposalWithConfig(id string) string {
 // 0 - Not voted
 // 1 - Voted against
 // 3 - Voted in favor
-func GetVote(id string, voter std.Address) string {
+func GetVote(id, voter string) string {
 	if gGovernor == nil {
 		panic("governor not initialized")
 	}
 
-	voteValue := uint8(0) // Default: Not voted
-	votes, exists := gGovernor.vote[id]
+	voteKey := id + ":" + voter
+	voteValue, exists := gGovernor.vote.Get(voteKey)
+
+	var vote float64
 	if exists {
-		voteValue = votes[voter]
+		switch v := voteValue.(type) {
+		case uint8:
+			vote = float64(v)
+		case float64:
+			vote = v
+		default:
+			panic(ufmt.Sprintf("Unexpected vote value type: %T", voteValue))
+		}
 	}
 
 	voteNode := json.ObjectNode("", nil)
@@ -217,7 +231,7 @@ func GetVote(id string, voter std.Address) string {
 	if err != nil {
 		panic(ufmt.Sprintf("Error appending to JSON object: %v", err))
 	}
-	err = voteNode.AppendObject("voter", json.StringNode("voter", voter.String()))
+	err = voteNode.AppendObject("voter", json.StringNode("voter", voter))
 	if err != nil {
 		panic(ufmt.Sprintf("Error appending to JSON object: %v", err))
 	}
