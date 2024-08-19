@@ -170,7 +170,6 @@ func TestGetProposalWithConfig(t *testing.T) {
 		ConfigVersion: 1,
 	}
 
-	// gGovernor.proposals[testProposalID] = testProposal
 	gGovernor.proposals.Set(testProposalID, testProposal)
 
 	jsonStr := GetProposalWithConfig(testProposalID)

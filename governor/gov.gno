@@ -151,7 +151,7 @@ func Describe(id, description string) {
 	)
 }
 
-// // ProposeAndDescribe combines the functionality of Propose and Describe.
+// ProposeAndDescribe combines the functionality of Propose and Describe.
 // It creates a new proposal and immediately adds a description to it.
 // Returns the proposal ID and an error if either the proposal creation or description fails.
 func ProposeAndDescribe(callsJSON, desc string) (string, error) {
@@ -250,7 +250,6 @@ func Cancel(id string) {
 		panic("Governor not initialized")
 	}
 
-	// proposal, exists := gGovernor.proposals[id]
 	proposalValue, exists := gGovernor.proposals.Get(id)
 	if !exists {
 		panic("DOES_NOT_EXIST")
