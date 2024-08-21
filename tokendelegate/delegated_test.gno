@@ -13,7 +13,7 @@ import (
 // mockGRC20 is a mock implementation of the IGRC20 interface for testing
 type mockGRC20 struct {
 	balances    map[std.Address]uint64
-	allowances  map[std.Address]map[std.Address]uint64
+	allowances  *avl.Tree
 	totalSupply uint64
 	name        string
 	symbol      string
@@ -27,7 +27,7 @@ type mockGRC20 struct {
 func newMockGRC20(name, symbol string, decimals uint8) *mockGRC20 {
 	return &mockGRC20{
 		balances:   make(map[std.Address]uint64),
-		allowances: make(map[std.Address]map[std.Address]uint64),
+		allowances: avl.NewTree(),
 		name:       name,
 		symbol:     symbol,
 		decimals:   decimals,
@@ -65,15 +65,18 @@ func (m *mockGRC20) Transfer(to std.Address, amount uint64) error {
 }
 
 func (m *mockGRC20) Allowance(owner, spender std.Address) uint64 {
-	return m.allowances[owner][spender]
+	key := owner.String() + ":" + spender.String()
+	value, exists := m.allowances.Get(key)
+	if !exists {
+		return 0
+	}
+	return value.(uint64)
 }
 
 func (m *mockGRC20) Approve(spender std.Address, amount uint64) error {
 	owner := std.GetOrigCaller()
-	if m.allowances[owner] == nil {
-		m.allowances[owner] = make(map[std.Address]uint64)
-	}
-	m.allowances[owner][spender] = amount
+	key := owner.String() + ":" + spender.String()
+	m.allowances.Set(key, amount)
 	return nil
 }
 
