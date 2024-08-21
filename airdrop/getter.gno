@@ -166,7 +166,7 @@ func createAirdropFromJSON(jsonStr string) *Airdrop {
 	configNode := node.MustKey("config")
 
 	timestamp := configNode.MustKey("refundable_timestamp").MustString()
-	refundableTimestamp, err := parseUint(timestamp, 10, 64)
+	refundableTimestamp, err := strconv.Atoi(timestamp)
 	if err != nil {
 		panic(err)
 	}
@@ -180,7 +180,7 @@ func createAirdropFromJSON(jsonStr string) *Airdrop {
 	claimedBitmap := make(map[uint64]uint64)
 
 	claimedBitmapNode.ObjectEach(func(key string, value *json.Node) {
-		index, err := parseUint(key, 10, 64)
+		index, err := strconv.Atoi(key)
 		if err != nil {
 			panic(err)
 		}
@@ -188,12 +188,12 @@ func createAirdropFromJSON(jsonStr string) *Airdrop {
 		if err != nil {
 			panic(err)
 		}
-		claimedBitmap[index] = bitmap
+		claimedBitmap[uint64(index)] = bitmap
 	})
 
 	return &Airdrop{
 		config: Config{
-			RefundableTimestamp: refundableTimestamp,
+			RefundableTimestamp: uint64(refundableTimestamp),
 			RefundTo:            refundTo,
 		},
 		address:       address,
