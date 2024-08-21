@@ -117,6 +117,20 @@ func GetClaimStatus(jsonStr string, claimID uint64) string {
 }
 
 // AirdropToJSON converts an Airdrop struct to a JSON string.
+//
+// Example:
+//
+//	{
+//	  "config": {
+//	    "refundable_timestamp": "1234567890",
+//	    "refund_to": "g1234567890abcdefghijklmnop"
+//	  },
+//	  "address": "g1234567890abcdefghijklmnop",
+//	  "claimed_bitmap": { // ref: getter_test.gno/TestAirdropToJSONAndCreateAirdropFromJSON
+//	    "0": "101",
+//	    "1": "1101",
+//	  },
+//	}
 func AirdropToJSON(a *Airdrop) string {
 	node := json.ObjectNode("", nil)
 
