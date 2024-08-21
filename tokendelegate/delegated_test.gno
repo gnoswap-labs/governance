@@ -1,4 +1,4 @@
-package delegation
+package tokendelegate
 
 import (
 	"errors"
