@@ -1,4 +1,4 @@
-# Delegation Token
+# Delegated Token
 
 ## Overview
 
@@ -6,7 +6,7 @@ The `delegation` package provides a mechanism for token holders to delegate thei
 
 This is useful in governance systems where token holders may want to participate in decision-making processes but delegate the actual voting to more active or reliable participants.
 
-## Flow of Delegation
+## Flow of Token Delegation
 
 The following diagram illustrates the flow of delegation in the `delegation` package:
 
