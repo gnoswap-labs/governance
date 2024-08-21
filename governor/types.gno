@@ -35,6 +35,9 @@ type Governor struct {
 	// vote stores the voting information for each proposal
 	// The uint8 value represents: 0 = not voted, 2 = voted no, 3 = voted yes
 	vote *avl.Tree
+
+	votingStartTime uint64
+	votingEndTime   uint64
 }
 
 // Config represents the configuration of the governor contract
@@ -87,6 +90,9 @@ type ProposalInfo struct {
 
 	// The version of the config that this proposal was created with
 	ConfigVersion uint64
+
+	// The title of the proposal
+	Title string `json:"title"`
 
 	// The description of the proposal
 	Description string `json:"description"`

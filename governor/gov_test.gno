@@ -158,8 +158,9 @@ func TestDescribe(t *testing.T) {
 	id, _ := Propose(callsJSON)
 
 	t.Run("Successful description", func(t *testing.T) {
+		title := "Test proposal"
 		description := "This is a test proposal"
-		Describe(id, description)
+		Describe(id, title, description)
 
 		proposalValue, exists := gGovernor.proposals.Get(id)
 		if !exists {
@@ -177,12 +178,12 @@ func TestDescribe(t *testing.T) {
 		defer func() {
 			if r := recover(); r == nil {
 				t.Errorf("The code did not panic")
-			} else if r != "DOES_NOT_EXIST" {
+			} else if r != ufmt.Sprintf("proposal %s does not exist", nonExistentID) {
 				t.Errorf("Unexpected panic: %v", r)
 			}
 		}()
 
-		Describe(nonExistentID, "Test description")
+		Describe(nonExistentID, "foo", "Test description")
 	})
 
 	t.Run("Already executed proposal", func(t *testing.T) {
@@ -194,12 +195,12 @@ func TestDescribe(t *testing.T) {
 		defer func() {
 			if r := recover(); r == nil {
 				t.Errorf("The code did not panic")
-			} else if r != "ALREADY_EXECUTED" {
+			} else if r != ufmt.Sprintf("proposal %s has already been executed", id) {
 				t.Errorf("Unexpected panic: %v", r)
 			}
 		}()
 
-		Describe(id, "Test description")
+		Describe(id, "foo", "Test description")
 	})
 
 	t.Run("Canceled proposal", func(t *testing.T) {
@@ -212,12 +213,12 @@ func TestDescribe(t *testing.T) {
 		defer func() {
 			if r := recover(); r == nil {
 				t.Errorf("The code did not panic")
-			} else if r != "PROPOSAL_CANCELED" {
+			} else if r != ufmt.Sprintf("proposal %s has already been canceled", id) {
 				t.Errorf("Unexpected panic: %v", r)
 			}
 		}()
 
-		Describe(id, "Test description")
+		Describe(id, "foo", "Test description")
 	})
 }
 
@@ -243,10 +244,11 @@ func TestProposeAndDescribe(t *testing.T) {
 		testutils.TestAddress("test_address").String(),
 	)
 
+	title := "Test proposal"
 	description := "Test proposal description"
 
 	t.Run("Successful propose and describe", func(t *testing.T) {
-		id, err := ProposeAndDescribe(callsJSON, description)
+		id, err := ProposeAndDescribe(callsJSON, title, description)
 		if err != nil {
 			t.Fatalf("ProposeAndDescribe failed: %v", err)
 		}
@@ -286,7 +288,7 @@ func TestProposeAndDescribe(t *testing.T) {
 			}
 		}()
 
-		ProposeAndDescribe(callsJSON, description)
+		ProposeAndDescribe(callsJSON, title, description)
 	})
 }
 
@@ -348,7 +350,7 @@ func TestVote(t *testing.T) {
 		defer func() {
 			if r := recover(); r == nil {
 				t.Errorf("The code did not panic")
-			} else if r != "VOTING_NOT_STARTED" {
+			} else if r != ufmt.Sprintf("voting has not started yet. Current time: %d, Voting start time: %d", currentTime, gGovernor.votingStartTime) {
 				t.Errorf("Unexpected panic: %v", r)
 			}
 		}()
@@ -365,7 +367,7 @@ func TestVote(t *testing.T) {
 		defer func() {
 			if r := recover(); r == nil {
 				t.Errorf("The code did not panic")
-			} else if r != "VOTING_ENDED" {
+			} else if r != ufmt.Sprintf("voting has ended. Current time: %d, Voting end time: %d", currentTime, gGovernor.votingEndTime) {
 				t.Errorf("Unexpected panic: %v", r)
 			}
 		}()
@@ -444,7 +446,7 @@ func TestCancel(t *testing.T) {
 		defer func() {
 			if r := recover(); r == nil {
 				t.Errorf("The code did not panic")
-			} else if r != "ALREADY_CANCELED" {
+			} else if r != ufmt.Sprintf("proposal %s has already been canceled", id) {
 				t.Errorf("Unexpected panic: %v", r)
 			}
 		}()
@@ -467,7 +469,7 @@ func TestCancel(t *testing.T) {
 		defer func() {
 			if r := recover(); r == nil {
 				t.Errorf("The code did not panic")
-			} else if r != "VOTING_STARTED" {
+			} else if r != ufmt.Sprintf("voting has already started for proposal %s", id) {
 				t.Errorf("Unexpected panic: %v", r)
 			}
 		}()
@@ -523,8 +525,6 @@ func TestGetConfigVersion(t *testing.T) {
 			ExecutionWindow:               2000,
 		}
 
-		// gGovernor.configVersions[1] = newConfig
-		// gGovernor.latestConfigVersion = 1
 		gGovernor.configVersions.Set("1", newConfig)
 		gGovernor.latestConfigVersion = 1
 
