@@ -3,6 +3,7 @@ package tokendelegate
 import (
 	"std"
 
+	"gno.land/p/demo/avl"
 	"gno.land/p/demo/grc/grc20"
 	u256 "gno.land/p/demo/uint256"
 )
@@ -32,7 +33,8 @@ type DelegatedToken struct {
 	balances    map[std.Address]*u256.Uint
 
 	// allowances tracks the spending allowances for delegated tokens.
-	allowances  map[std.Address]map[std.Address]*u256.Uint
+	allowances  *avl.Tree
+	// allowances  map[std.Address]map[std.Address]*u256.Uint
 
 	// totoalSupply represents the total amount of delegated tokens in circulation.
 	totalSupply *u256.Uint
@@ -60,35 +62,12 @@ func New(staker std.Address, token grc20.Token, name string, symbol string, cont
 		token:       token,
 		delegatedTo: make(map[std.Address]std.Address),
 		balances:    make(map[std.Address]*u256.Uint),
+		allowances:  avl.NewTree(),
 		totalSupply: u256.Zero(),
 		name:        name,
 		symbol:      symbol,
 		contractAddr: contractAddr,
 	}
-}
-
-// GetStaker returns the addrress of the staker that this delegated token wrapper uses.
-func GetStaker() std.Address {
-	if gDelegatedToken == nil {
-		panic("DelegatedToken not initialized")
-	}
-	return gDelegatedToken.staker
-}
-
-// GetDelegatedTo returns the address to whom the owner is delegated.
-func GetDelegatedTo(owner string) std.Address {
-	if gDelegatedToken == nil {
-		panic("DelegatedToken not initialized")
-	}
-
-	ownerAddr := std.Address(owner)
-	delegatee, exists := gDelegatedToken.delegatedTo[ownerAddr]
-	if !exists {
-		// if not explicitly delegated, return owner
-		return ownerAddr
-	}
-
-	return delegatee
 }
 
 func Delegate(owner, to string) {
@@ -100,9 +79,10 @@ func Delegate(owner, to string) {
 	toAddr := std.Address(to)
 
 	currDelegatee := GetDelegatedTo(owner)
+	delegateeAddr := std.Address(currDelegatee)
 
 	// if the new delegation is different from the current one
-	if currDelegatee != toAddr {
+	if delegateeAddr != toAddr {
 		gDelegatedToken.delegatedTo[ownerAddr] = toAddr
 
 		std.Emit(
@@ -226,4 +206,14 @@ func BalanceOf(account string) *u256.Uint {
 	}
 
 	return balance
+}
+
+// SetAllowance sets the spending allowance for a spender.
+func SetAllowance(owner, spender std.Address, amount *u256.Uint) {
+	if gDelegatedToken == nil {
+		panic("DelegatedToken not initialized")
+	}
+
+	key := owner.String() + ":" + spender.String()
+	gDelegatedToken.allowances.Set(key, amount)
 }
