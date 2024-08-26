@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"gno.land/p/demo/avl"
 	u256 "gno.land/p/demo/uint256"
 )
 
@@ -17,7 +18,7 @@ type Governor struct {
 	config Config
 
 	// configVersions stores all historical configurations indexed by their version number
-	configVersions map[uint64]Config
+	configVersions *avl.Tree
 
 	// latestConfigVersion is the version number of the most recent configuration
 	latestConfigVersion uint64
@@ -26,14 +27,17 @@ type Governor struct {
 	nonce uint64
 
 	// proposals stores all proposals indexed by their ID
-	proposals map[string]ProposalInfo
+	proposals *avl.Tree
 
 	// latestProposalByProposer keeps track of the latest proposal ID for each proposer
-	latestProposalByProposer map[std.Address]string
+	latestProposalByProposer *avl.Tree
 
 	// vote stores the voting information for each proposal
 	// The uint8 value represents: 0 = not voted, 2 = voted no, 3 = voted yes
-	vote map[string]map[std.Address]uint8
+	vote *avl.Tree
+
+	votingStartTime uint64
+	votingEndTime   uint64
 }
 
 // Config represents the configuration of the governor contract
@@ -86,6 +90,12 @@ type ProposalInfo struct {
 
 	// The version of the config that this proposal was created with
 	ConfigVersion uint64
+
+	// The title of the proposal
+	Title string `json:"title"`
+
+	// The description of the proposal
+	Description string `json:"description"`
 }
 
 // Call represents a contract call
