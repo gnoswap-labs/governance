@@ -44,8 +44,11 @@ type Airdrop struct {
 	snapshotManager *snapshot.Manager
 }
 
+var airdropToken grc20.Token
+
 // NewAirdrop creates a new Airdrop instance
 func NewAirdrop(token grc20.Token, config Config, addr std.Address) *Airdrop {
+	airdropToken = token
 	return &Airdrop{
 		token:           token,
 		config:          config,

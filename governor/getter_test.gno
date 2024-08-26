@@ -131,7 +131,8 @@ func TestGetProposal(t *testing.T) {
 		Nay:           u256.NewUint(500),
 		ConfigVersion: 1,
 	}
-	gGovernor.proposals[testProposalID] = testProposal
+
+	gGovernor.proposals.Set(testProposalID, testProposal)
 
 	jsonStr := GetProposal(testProposalID)
 	expectedJSON := `{"call_hash":"test_calls_hash","proposer":"g1w3jhxazlwpex7ur0wdjhyh6lta047h6l7atze0","execution_state":{"created":1000,"executed":0,"canceled":0},"yea":1000,"nay":500,"config_version":1}`
@@ -169,7 +170,7 @@ func TestGetProposalWithConfig(t *testing.T) {
 		ConfigVersion: 1,
 	}
 
-	gGovernor.proposals[testProposalID] = testProposal
+	gGovernor.proposals.Set(testProposalID, testProposal)
 
 	jsonStr := GetProposalWithConfig(testProposalID)
 	expectedJSON := `{"config":{"VotingStartDelay":100,"VotingPeriod":200,"VotingWeightSmoothingDuration":300,"Quorum":400,"ProposalCreationThreshold":500,"ExecutionDelay":600,"ExecutionWindow":700},"proposal":{"call_hash":"test_calls_hash","proposer":"g1w3jhxazlwpex7ur0wdjhyh6lta047h6l7atze0","execution_state":{"created":1000,"executed":0,"canceled":0},"yea":1000,"nay":500,"config_version":1}}`
@@ -194,9 +195,9 @@ func TestGetVote(t *testing.T) {
 	_setupTestConfig(t)
 
 	testProposalID := "test_proposal_1"
-	testVoter := testutils.TestAddress("test_voter")
-	gGovernor.vote[testProposalID] = make(map[std.Address]uint8)
-	gGovernor.vote[testProposalID][testVoter] = 3 // Voted in favor
+	testVoter := testutils.TestAddress("test_voter").String()
+	voteKey := testProposalID + ":" + testVoter
+	gGovernor.vote.Set(voteKey, uint8(3)) // Voted in favor
 
 	jsonStr := GetVote(testProposalID, testVoter)
 
@@ -222,8 +223,8 @@ func TestGetVote(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get voter: %v", err)
 	}
-	if voter != testVoter.String() {
-		t.Errorf("Expected voter to be '%s', but got %v", testVoter.String(), voter)
+	if voter != testVoter {
+		t.Errorf("Expected voter to be '%s', but got %v", testVoter, voter)
 	}
 
 	vote, err := node.MustKey("vote").Value()
