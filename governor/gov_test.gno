@@ -66,7 +66,7 @@ func TestPropose(t *testing.T) {
 		Init(mockStaker, config)
 		toAddr := testutils.TestAddress("test_address").String()
 		callsJSON := ufmt.Sprintf(
-			`[{"to":"%s","selector":1,"calldata":"test_data"}]`,
+			`[{"to":"%s","function_name":"Foo","calldata":"test_data"}]`,
 			toAddr,
 		)
 
@@ -98,7 +98,7 @@ func TestPropose(t *testing.T) {
 		Init(mockStaker, config)
 		mockStaker.averageDelegated = uint256.NewUint(50) // Below threshold
 		callsJSON := ufmt.Sprintf(
-			`[{"to":"%s","selector":1,"calldata":"test_data"}]`,
+			`[{"to":"%s","function_name":"Foo","calldata":"test_data"}]`,
 			testutils.TestAddress("test_address").String(),
 		)
 
@@ -117,7 +117,7 @@ func TestPropose(t *testing.T) {
 		Init(mockStaker, config)
 		mockStaker.averageDelegated = uint256.NewUint(1000) // Above threshold
 		callsJSON := ufmt.Sprintf(
-			`[{"to":"%s","selector":1,"calldata":"test_data"}]`,
+			`[{"to":"%s","function_name":"Foo","calldata":"test_data"}]`,
 			testutils.TestAddress("test_address").String(),
 		)
 
@@ -154,7 +154,10 @@ func TestDescribe(t *testing.T) {
 
 	Init(mockStaker, config)
 
-	callsJSON := `[{"to":"g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5","selector":1,"calldata":"test_data"}]`
+	callsJSON := ufmt.Sprintf(
+		`[{"to":"%s","function_name":"Foo","calldata":"test_data"}]`,
+		testutils.TestAddress("test_address").String(),
+	)
 	id, _ := Propose(callsJSON)
 
 	t.Run("Successful description", func(t *testing.T) {
@@ -240,7 +243,7 @@ func TestProposeAndDescribe(t *testing.T) {
 	Init(mockStaker, config)
 
 	callsJSON := ufmt.Sprintf(
-		`[{"to":"%s","selector":1,"calldata":"test_data"}]`,
+		`[{"to":"%s","function_name":"Foo","calldata":"test_data"}]`,
 		testutils.TestAddress("test_address").String(),
 	)
 
@@ -310,7 +313,7 @@ func TestVote(t *testing.T) {
 	Init(mockStaker, config)
 
 	callsJSON := ufmt.Sprintf(
-		`[{"to":"%s","selector":1,"calldata":"test_data"}]`,
+		`[{"to":"%s","function_name":"Foo","calldata":"test_data"}]`,
 		testutils.TestAddress("test_address").String(),
 	)
 
@@ -422,7 +425,7 @@ func TestCancel(t *testing.T) {
 	Init(mockStaker, config)
 
 	callsJSON := ufmt.Sprintf(
-		`[{"to":"%s","selector":1,"calldata":"test_data"}]`,
+		`[{"to":"%s","function_name":"Foo","calldata":"test_data"}]`,
 		testutils.TestAddress("test_address").String(),
 	)
 
@@ -535,119 +538,155 @@ func TestGetConfigVersion(t *testing.T) {
 	})
 }
 
+// TODO: inter-contract function call tests
+func TestExecuteExternalContractFunction(t *testing.T) {
+    externalContractAddr := testutils.TestAddress("external_contract")
+
+    mockStaker := &MockStaker{
+        averageDelegated: uint256.NewUint(1000),
+    }
+    config := Config{
+        VotingStartDelay:              100,
+        VotingPeriod:                  1000,
+        VotingWeightSmoothingDuration: 100,
+        Quorum:                        500,
+        ProposalCreationThreshold:     100,
+        ExecutionDelay:                100,
+        ExecutionWindow:               1000,
+    }
+    Init(mockStaker, config)
+
+    RegisterFunction(externalContractAddr, "ExternalFunction", func(args ...string) (string, error) {
+        return "External function executed with args: " + strings.Join(args, ", "), nil
+    })
+
+    callsJSON := ufmt.Sprintf(
+        `[{"to":"%s","function_name":"ExternalFunction","calldata":"arg1,arg2"}]`,
+        externalContractAddr.String(),
+    )
+    id, err := Propose(callsJSON)
+    if err != nil {
+        t.Fatalf("Propose failed: %v", err)
+    }
+}
+
 func TestExecuteCall(t *testing.T) {
-	tests := []struct {
-		name     string
-		selector uint64
-		calldata string
-		register func(uint64)
-		expected string
-		wantErr  bool
-	}{
-		{
-			name:     "Simple concatenation",
-			selector: 1,
-			calldata: "World",
-			register: func(selector uint64) {
-				RegisterFunction(selector, func(args ...string) (string, error) {
-					if len(args) < 1 {
-						return "", errors.New("no data provided")
-					}
-					return "Hello, " + strings.Join(args, " "), nil
-				})
-			},
-			expected: "Hello, World",
-			wantErr:  false,
-		},
-		{
-			name:     "Uppercase conversion",
-			selector: 2,
-			calldata: "lowercase",
-			register: func(selector uint64) {
-				RegisterFunction(selector, func(data ...string) (string, error) {
-					if len(data) < 1 {
-						return "", errors.New("no data provided")
-					}
-					return strings.ToUpper(data[0]), nil
-				})
-			},
-			expected: "LOWERCASE",
-			wantErr:  false,
-		},
-		{
-			name:     "Error case",
-			selector: 3,
-			calldata: "error",
-			register: func(selector uint64) {
-				RegisterFunction(selector, func(data ...string) (string, error) {
-					return "", errors.New("test error")
-				})
-			},
-			expected: "",
-			wantErr:  true,
-		},
-		{
-			name:     "multiple arguments",
-			selector: 4,
-			calldata: "arg1,arg2,arg3",
-			register: func(selector uint64) {
-				RegisterFunction(selector, func(data ...string) (string, error) {
-					if len(data) < 3 {
-						return "", errors.New("not enough arguments")
-					}
-					return strings.Join(data, " "), nil
-				})
-			},
-			expected: "arg1 arg2 arg3",
-			wantErr:  false,
-		},
-		{
-			name:     "Unregistered function",
-			selector: 4,
-			calldata: "test",
-			register: func(selector uint64) {
-				// Don't register any function
-			},
-			expected: "",
-			wantErr:  true,
-		},
-	}
+    testAddr1 := testutils.TestAddress("test1")
+    testAddr2 := testutils.TestAddress("test2")
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.register(tt.selector)
+    tests := []struct {
+        name           string
+        contractAddr   std.Address
+        functionName   string
+        calldata       string
+        register       func(std.Address, string)
+        expected       string
+        wantErr        bool
+    }{
+        {
+            name:         "Simple concatenation",
+            contractAddr: testAddr1,
+            functionName: "Concatenate",
+            calldata:     "Hello,World",
+            register: func(addr std.Address, name string) {
+                RegisterFunction(addr, name, func(args ...string) (string, error) {
+                    return strings.Join(args, " "), nil
+                })
+            },
+            expected: "Hello World",
+            wantErr:  false,
+        },
+        {
+            name:         "Uppercase conversion",
+            contractAddr: testAddr1,
+            functionName: "Uppercase",
+            calldata:     "lowercase",
+            register: func(addr std.Address, name string) {
+                RegisterFunction(addr, name, func(data ...string) (string, error) {
+                    if len(data) < 1 {
+                        return "", errors.New("no data provided")
+                    }
+                    return strings.ToUpper(data[0]), nil
+                })
+            },
+            expected: "LOWERCASE",
+            wantErr:  false,
+        },
+        {
+            name:         "Error case",
+            contractAddr: testAddr2,
+            functionName: "ErrorFunction",
+            calldata:     "error",
+            register: func(addr std.Address, name string) {
+                RegisterFunction(addr, name, func(data ...string) (string, error) {
+                    return "", errors.New("test error")
+                })
+            },
+            expected: "",
+            wantErr:  true,
+        },
+        {
+            name:         "Multiple arguments",
+            contractAddr: testAddr2,
+            functionName: "MultiArg",
+            calldata:     "arg1,arg2,arg3",
+            register: func(addr std.Address, name string) {
+                RegisterFunction(addr, name, func(data ...string) (string, error) {
+                    if len(data) < 3 {
+                        return "", errors.New("not enough arguments")
+                    }
+                    return strings.Join(data, " "), nil
+                })
+            },
+            expected: "arg1 arg2 arg3",
+            wantErr:  false,
+        },
+        {
+            name:         "Unregistered function",
+            contractAddr: testAddr1,
+            functionName: "Unregistered",
+            calldata:     "test",
+            register:     func(addr std.Address, name string) {}, // Don't register any function
+            expected:     "",
+            wantErr:      true,
+        },
+    }
 
-			call := Call{
-				To:       testutils.TestAddress("test_address"),
-				Selector: tt.selector,
-				Calldata: tt.calldata,
-			}
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            tt.register(tt.contractAddr, tt.functionName)
 
-			if tt.wantErr {
-				defer func() {
-					if r := recover(); r == nil {
-						t.Errorf("executeCall() did not panic as expected")
-					}
-				}()
-			}
+            call := Call{
+                To:           tt.contractAddr,
+                FunctionName: tt.functionName,
+                Calldata:     tt.calldata,
+            }
 
-			result := executeCall(call)
+            if tt.wantErr {
+                defer func() {
+                    if r := recover(); r == nil {
+                        t.Errorf("executeCall() did not panic as expected")
+                    }
+                }()
+            }
 
-			if !tt.wantErr {
-				if result != tt.expected {
-					t.Errorf("executeCall() = %s, want %s", result, tt.expected)
-				}
-			}
-		})
-	}
+            result := executeCall(call)
+
+            if !tt.wantErr {
+                if result != tt.expected {
+                    t.Errorf("executeCall() = %s, want %s", result, tt.expected)
+                }
+            }
+        })
+    }
 }
 
 func TestExecute(t *testing.T) {
-	RegisterFunction(1, func(args ...string) (string, error) {
+	RegisterFunction(testutils.TestAddress("test_address"), "Foo", func(args ...string) (string, error) {
 		if len(args) < 1 {
 			return "", errors.New("no data provided")
 		}
-		return "Executed: " + strings.Join(args, " "), nil
+		return "Executed: " + args[0], nil
 	})
 
 	setupGovernor := func() (string, string, Config) {
@@ -668,7 +707,7 @@ func TestExecute(t *testing.T) {
 		Init(mockStaker, config)
 
 		callsJSON := ufmt.Sprintf(
-			`[{"to":"%s","selector":1,"calldata":"test_data"}]`,
+			`[{"to":"%s","function_name":"Foo","calldata":"test_data"}]`,
 			testutils.TestAddress("test_address").String(),
 		)
 

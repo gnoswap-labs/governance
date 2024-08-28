@@ -22,13 +22,13 @@ func TestParseCallsFromJSON(t *testing.T) {
 		{
 			name:  "Valid single call",
 			input: ufmt.Sprintf(
-				`[{"to":"%s","selector":1,"calldata":"test"}]`,
+				`[{"to":"%s","function_name":"Foo","calldata":"test"}]`,
 				testAddr1.String(),
 			),
 			want: []Call{
 				{
 					To:       testAddr1,
-					Selector: 1,
+					FunctionName: "Foo",
 					Calldata: "test",
 				},
 			},
@@ -37,19 +37,19 @@ func TestParseCallsFromJSON(t *testing.T) {
 		{
 			name:  "Valid multiple calls",
 			input: ufmt.Sprintf(
-				`[{"to":"%s","selector":1,"calldata":"test1"},{"to":"%s","selector":2,"calldata":"test2"}]`,
+				`[{"to":"%s","function_name":"Foo","calldata":"test1"},{"to":"%s","function_name":"Bar","calldata":"test2"}]`,
 				testAddr1.String(),
 				testAddr2.String(),
 			),
 			want: []Call{
 				{
 					To:       testAddr1,
-					Selector: 1,
+					FunctionName: "Foo",
 					Calldata: "test1",
 				},
 				{
 					To:       testAddr2,
-					Selector: 2,
+					FunctionName: "Bar",
 					Calldata: "test2",
 				},
 			},
@@ -57,7 +57,7 @@ func TestParseCallsFromJSON(t *testing.T) {
 		},
 		{
 			name:    "Not an array",
-			input:   `{"to":"` + testAddr1.String() + `","selector":1,"calldata":"test"}`,
+			input: ufmt.Sprintf(`{"to":"%s","function_name":"Foo","calldata":"test"}`, testAddr1.String()),
 			want:    nil,
 			wantErr: true,
 		},
@@ -87,8 +87,8 @@ func TestParseCallsFromJSON(t *testing.T) {
 					if call.To != tt.want[i].To {
 						t.Errorf("Call %d: To = %v, want %v", i, call.To, tt.want[i].To)
 					}
-					if call.Selector != tt.want[i].Selector {
-						t.Errorf("Call %d: Selector = %v, want %v", i, call.Selector, tt.want[i].Selector)
+					if call.FunctionName != tt.want[i].FunctionName {
+						t.Errorf("Call %d: FunctionName = %v, want %v", i, call.FunctionName, tt.want[i].FunctionName)
 					}
 					if call.Calldata != tt.want[i].Calldata {
 						t.Errorf("Call %d: Calldata = %v, want %v", i, call.Calldata, tt.want[i].Calldata)

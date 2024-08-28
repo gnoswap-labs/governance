@@ -74,15 +74,11 @@ func parseCall(node *json.Node) (Call, error) {
 	}
 	call.To = std.Address(toNode.MustString())
 
-	// parse `selector` field: must be a number type
-	selectorNode := node.MustKey("selector")
-	if !selectorNode.IsNumber() {
-		return Call{}, ufmt.Errorf("'selector' must be a number")
+	functionNameNode := node.MustKey("function_name")
+	if !functionNameNode.IsString() {
+		return Call{}, ufmt.Errorf("'function_name' must be a string")
 	}
-	call.Selector, err = parseUint(selectorNode.String(), 10, 64)
-	if err != nil {
-		return Call{}, ufmt.Errorf("invalid 'selector': %v", err)
-	}
+	call.FunctionName = functionNameNode.MustString()
 
 	// parse `calldata` field: must be a string type, will be coneverted to a byte slice
 	calldataNode := node.MustKey("calldata")
