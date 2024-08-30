@@ -11,6 +11,10 @@ import (
 	"gno.land/p/demo/ufmt"
 )
 
+var getCurrentTime = func() uint64 {
+	return uint64(time.Now().Unix())
+}
+
 var (
 	ErrInsufficientBalance = errors.New("insufficient balance")
 	ErrUnauthorized        = errors.New("unauthorized")
@@ -82,7 +86,7 @@ func StakeAmount(delegate, amount string) {
 	// Update delegation history
 	gStaker.delegationHistory[delegateAddr] = append(gStaker.delegationHistory[delegateAddr], DelegationHistory{
 		amount:    gStaker.delegations[delegateAddr].Clone(),
-		timestamp: uint64(time.Now().Unix()),
+		timestamp: getCurrentTime(),
 	})
 }
 
@@ -141,41 +145,37 @@ func WithdrawAmount(delegate, recipient, amount string) {
 }
 
 // GetDelegatedCumulative gets the cumulative delegated amount * seconds for an address at a certain timestamp.
-func GetDelegatedCumulative(delegate string, timestamp uint64) (string, error) {
-	delegateAddr := std.Address(delegate)
-	if !delegateAddr.IsValid() {
-		panic(ufmt.Sprintf("invalid address: %s", delegate))
+func GetDelegatedCumulative(delegate std.Address, timestamp uint64) string { // return u256.String(), error
+	if timestamp > getCurrentTime() {
+		panic(ufmt.Sprintf("error: timestamp %d is in the future", timestamp))
 	}
 
-	if timestamp > uint64(time.Now().Unix()) {
-		panic("FUTURE")
+	numSnapshots := uint64(len(gStaker.delegationHistory[delegate]))
+	if numSnapshots == 0 {
+		return "0"
 	}
 
-	history, exists := gStaker.delegationHistory[delegateAddr]
-	if !exists || len(history) == 0 {
-		return u256.Zero().ToString(), nil
-	}
+	return findDelegatedCumulative(delegate, 0, numSnapshots, timestamp)
+}
 
-	var lastSnapshot DelegationHistory
-	var cumulativeAmount u256.Uint
+func findDelegatedCumulative(delegate std.Address, minIndex, maxIndexExclusive, timestamp uint64) string {
+    if minIndex >= maxIndexExclusive {
+        return "0"
+    }
 
-	for _, snapshot := range history {
-		if snapshot.timestamp > timestamp {
-			break
-		}
-		if lastSnapshot.timestamp != 0 {
-			duration := snapshot.timestamp - lastSnapshot.timestamp
-			cumulativeAmount.Add(&cumulativeAmount, u256.Zero().Mul(lastSnapshot.amount, u256.NewUint(duration)))
-		}
-		lastSnapshot = snapshot
-	}
+    snapshot := gStaker.delegationHistory[delegate][minIndex]
+    if snapshot.timestamp > timestamp {
+        return "0"
+    }
 
-	if lastSnapshot.timestamp < timestamp {
-		duration := timestamp - lastSnapshot.timestamp
-		cumulativeAmount.Add(&cumulativeAmount, u256.Zero().Mul(lastSnapshot.amount, u256.NewUint(duration)))
-	}
+    if minIndex == maxIndexExclusive-1 || timestamp < gStaker.delegationHistory[delegate][minIndex+1].timestamp {
+        diff := timestamp - snapshot.timestamp
+        delegatedAmount := gStaker.delegations[delegate]
+        cumulativeAmount := u256.NewUint(0).Mul(delegatedAmount, u256.NewUint(diff))
+        return cumulativeAmount.ToString()
+    }
 
-	return cumulativeAmount.ToString(), nil
+    return findDelegatedCumulative(delegate, minIndex+1, maxIndexExclusive, timestamp)
 }
 
 // GetAverageDelegated calculates the average delegated amount for a delegate over a given period

@@ -234,6 +234,93 @@ func TestGetAverageDelegated(t *testing.T) {
 	}
 }
 
+func TestGetDelegatedCumulative(t *testing.T) {
+    baseTime := uint64(time.Now().Unix())
+
+    originalGetCurrentTime := getCurrentTime
+    defer func() { getCurrentTime = originalGetCurrentTime }()
+
+    var mockTime uint64
+    getCurrentTime = func() uint64 {
+        return mockTime
+    }
+
+    token := newMockGRC20("Test Token", "TST", 18)
+    Init(token)
+
+    delegatee := testutils.TestAddress("delegatee")
+
+    caller := std.GetOrigCaller()
+    token.balances[caller] = 12345
+
+    tests := []struct {
+        name        string
+        setupFunc   func()
+        timestamp   uint64
+        want        string
+        shouldPanic bool
+    }{
+        {
+            name:      "Initial state",
+            setupFunc: func() { mockTime = baseTime },
+            timestamp: baseTime,
+            want:      "0",
+        },
+        {
+            name: "Right after staking",
+            setupFunc: func() {
+                mockTime = baseTime + 1
+                StakeAmount(delegatee.String(), "12345")
+            },
+            timestamp: baseTime + 1,
+            want:      "0",
+        },
+        {
+            name:      "1 second after staking",
+            setupFunc: func() { mockTime = baseTime + 2 },
+            timestamp: baseTime + 2,
+            want:      "12345",
+        },
+        {
+            name:      "2 seconds after staking",
+            setupFunc: func() { mockTime = baseTime + 3 },
+            timestamp: baseTime + 3,
+            want:      "24690",
+        },
+        {
+            name:      "Past time",
+            setupFunc: func() {},
+            timestamp: baseTime,
+            want:      "0",
+        },
+        {
+            name:        "Future time",
+            setupFunc:   func() {},
+            timestamp:   baseTime + 1000,
+            shouldPanic: true,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            tt.setupFunc()
+
+            if tt.shouldPanic {
+                defer func() {
+                    if r := recover(); r == nil {
+                        t.Errorf("GetDelegatedCumulative() for future time should panic")
+                    }
+                }()
+            }
+
+            result := GetDelegatedCumulative(delegatee, tt.timestamp)
+            if result != tt.want {
+                t.Errorf("GetDelegatedCumulative() = %v, want %v", result, tt.want)
+            }
+        })
+    }
+}
+
 func TestGetAverageDelegatedOverLast(t *testing.T) {
 	token := newMockGRC20("Test Token", "TST", 42)
 	Init(token)
