@@ -3,12 +3,11 @@ package staker
 import (
 	"errors"
 	"std"
-	"strconv"
 	"time"
 
 	"gno.land/p/demo/grc/grc20"
-	u256 "gno.land/p/demo/uint256"
 	"gno.land/p/demo/ufmt"
+	u256 "gno.land/p/demo/uint256"
 )
 
 var (
@@ -22,6 +21,7 @@ var (
 type DelegationHistory struct {
 	amount    *u256.Uint
 	timestamp uint64
+	add       bool
 }
 
 // staking contract
@@ -83,6 +83,7 @@ func StakeAmount(delegate, amount string) {
 	gStaker.delegationHistory[delegateAddr] = append(gStaker.delegationHistory[delegateAddr], DelegationHistory{
 		amount:    gStaker.delegations[delegateAddr].Clone(),
 		timestamp: uint64(time.Now().Unix()),
+		add:       true,
 	})
 }
 
@@ -99,7 +100,7 @@ func WithdrawAmount(delegate, recipient, amount string) {
 		panic(ufmt.Sprintf("invalid address: %s", recipient))
 	}
 
-    amountUint, err := u256.FromDecimal(amount)
+	amountUint, err := u256.FromDecimal(amount)
 	if err != nil {
 		panic(err)
 	}
@@ -137,6 +138,7 @@ func WithdrawAmount(delegate, recipient, amount string) {
 	gStaker.delegationHistory[delegateAddr] = append(gStaker.delegationHistory[delegateAddr], DelegationHistory{
 		amount:    gStaker.delegations[delegateAddr].Clone(),
 		timestamp: uint64(time.Now().Unix()),
+		add:       false,
 	})
 }
 
@@ -156,23 +158,20 @@ func GetDelegatedCumulative(delegate string, timestamp uint64) (string, error) {
 		return u256.Zero().ToString(), nil
 	}
 
-	var lastSnapshot DelegationHistory
-	var cumulativeAmount u256.Uint
+	cumulativeAmount := u256.Zero()
 
 	for _, snapshot := range history {
 		if snapshot.timestamp > timestamp {
 			break
 		}
-		if lastSnapshot.timestamp != 0 {
-			duration := snapshot.timestamp - lastSnapshot.timestamp
-			cumulativeAmount.Add(&cumulativeAmount, u256.Zero().Mul(lastSnapshot.amount, u256.NewUint(duration)))
-		}
-		lastSnapshot = snapshot
-	}
+		duration := timestamp - snapshot.timestamp
+		toAccu := new(u256.Uint).Mul(snapshot.amount, u256.NewUint(duration))
 
-	if lastSnapshot.timestamp < timestamp {
-		duration := timestamp - lastSnapshot.timestamp
-		cumulativeAmount.Add(&cumulativeAmount, u256.Zero().Mul(lastSnapshot.amount, u256.NewUint(duration)))
+		if snapshot.add {
+			cumulativeAmount = cumulativeAmount.Add(cumulativeAmount, toAccu)
+		} else {
+			cumulativeAmount = cumulativeAmount.Sub(cumulativeAmount, toAccu)
+		}
 	}
 
 	return cumulativeAmount.ToString(), nil
@@ -196,53 +195,33 @@ func GetAverageDelegated(delegate string, start, end uint64) (string, error) {
 		return res.ToString(), nil
 	}
 
-	if start >= history[len(history)-1].timestamp {
-		res = history[len(history)-1].amount.Clone()
-		return res.ToString(), nil
-	}
-
 	if end <= history[0].timestamp {
 		return res.ToString(), nil
 	}
 
-	var (
-		totalAmount   u256.Uint
-		lastAmount    *u256.Uint
-		lastTimestamp uint64
-	)
-
+	cumulativeAmount := u256.Zero()
 	for i, record := range history {
 		if record.timestamp > end {
 			break
 		}
 
-		if i == 0 {
-			if record.timestamp > start {
-				totalAmount.Add(&totalAmount, u256.Zero().Mul(record.amount, u256.NewUint(record.timestamp-start)))
-			}
+		duration := end - maxUint64(record.timestamp, start)
+		toAccu := new(u256.Uint).Mul(record.amount, u256.NewUint(duration))
+
+		if record.add {
+			cumulativeAmount = cumulativeAmount.Add(cumulativeAmount, toAccu)
 		} else {
-			if record.timestamp > start {
-				duration := record.timestamp - maxUint64(start, lastTimestamp)
-				totalAmount.Add(&totalAmount, u256.Zero().Mul(lastAmount, u256.NewUint(duration)))
-			}
+			cumulativeAmount = cumulativeAmount.Sub(cumulativeAmount, toAccu)
 		}
-
-		lastAmount = record.amount
-		lastTimestamp = record.timestamp
-	}
-
-	if lastTimestamp < end {
-		duration := end - maxUint64(start, lastTimestamp)
-		totalAmount.Add(&totalAmount, u256.Zero().Mul(lastAmount, u256.NewUint(duration)))
 	}
 
 	totalDuration := end - start
 	if totalDuration == 0 {
-		res = lastAmount.Clone()
+		res = cumulativeAmount.Clone()
 		return res.ToString(), nil
 	}
 
-	res = u256.Zero().Div(&totalAmount, u256.NewUint(totalDuration))
+	res = u256.Zero().Div(cumulativeAmount, u256.NewUint(totalDuration))
 	return res.ToString(), nil
 }
 
