@@ -101,7 +101,8 @@ type ProposalInfo struct {
 // Call represents a contract call
 type Call struct {
 	To       std.Address
-	Selector uint64
+	// Selector uint64
+	FunctionName string
 	Calldata string
 }
 
@@ -112,7 +113,8 @@ func hashCalls(calls []Call) string {
 
 	for _, call := range calls {
 		buf.WriteString(string(call.To))
-		buf.WriteString(strconv.FormatUint(call.Selector, 10))
+		// buf.WriteString(strconv.FormatUint(call.Selector, 10))
+		buf.WriteString(call.FunctionName)
 		buf.WriteString(call.Calldata)
 	}
 

@@ -384,29 +384,34 @@ func Execute(id, callsJSON string) string {
 }
 
 // registry stores registered functions
-var registry = make(map[uint64]CallFunction)
+var registry = make(map[string]CallFunction)
 
 // RegisterFunction registers a function with the given selector.
 // This allows the governor to execute custom functions during proposal execution.
-func RegisterFunction(selector uint64, fn CallFunction) {
-	registry[selector] = fn
+func RegisterFunction(contractAddr std.Address, functionName string, fn CallFunction) {
+	key := getRegistryKey(contractAddr, functionName)
+	registry[key] = fn
+}
+
+func getRegistryKey(contractAddr std.Address, functionName string) string {
+	return contractAddr.String() + ":" + functionName
 }
 
 // executeCall executes a single call
 func executeCall(call Call) string {
-	fn, exists := registry[call.Selector]
+	key := getRegistryKey(call.To, call.FunctionName)
+	fn, exists := registry[key]
 	if !exists {
-		panic("FUNCTION_NOT_REGISTERED")
+		panic(ufmt.Sprintf("function %s not registered for contract %s", call.FunctionName, call.To.String()))
 	}
 
 	args := strings.Split(call.Calldata, ",")
-
 	result, err := fn(args...)
 	if err != nil {
-		panic("CALL_EXECUTION_FAILED: " + err.Error())
+		panic(ufmt.Sprintf("failed to execute function %s: %v", call.FunctionName, err))
 	}
 
-	return string(result)
+	return result
 }
 
 // GetConfigVersion returns the configuration for a specific version.
