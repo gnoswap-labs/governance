@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"gno.land/p/demo/avl"
-	"gno.land/p/demo/grc/grc20"
 	"gno.land/p/demo/json"
 	"gno.land/p/demo/ufmt"
 	u256 "gno.land/p/demo/uint256"
@@ -239,7 +238,7 @@ func Vote(id string, yes bool) {
 
 	gGovernor.proposals.Set(id, proposal)
 	gGovernor.vote.Set(voteKey, uint8(2+b2i(yes)))
-	
+
 	std.Emit(
 		"Voted",
 		"id", id,
@@ -299,7 +298,11 @@ func Cancel(id string) {
 // Returns the results of the executed calls.
 // Panics if any of the execution conditions are not met.
 //
-// XXX: Dynamic Call?
+// OBS: gno doens't support calling other contracts without importing them.
+// To bypass this limit, we can use two approaches:
+// 1. Import other contracts and call them directly. ( recommended, similar to how `go` import works )
+// 2. Use RegisterPattern to register the functions from target contract to governor contract and call them from here.
+// L#386 ~ L#410 in this file shows how to register and call functions from other contracts.
 func Execute(id, callsJSON string) string {
 	if gGovernor == nil {
 		panic("governor not initialized")
