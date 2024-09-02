@@ -6,9 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"gno.land/p/demo/grc/grc20"
 	"gno.land/p/demo/testutils"
-	"gno.land/p/demo/ufmt"
 	u256 "gno.land/p/demo/uint256"
 )
 
@@ -161,6 +159,73 @@ func TestWithdrawAmount(t *testing.T) {
 	}
 }
 
+func TestGetDelegatedCumulative(t *testing.T) {
+	token := newMockGRC20("Test Token", "TST", 42)
+	Init(token)
+
+	delegateAddr := testutils.TestAddress("delegate")
+	delegate := delegateAddr.String()
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("GetAverageDelegated panicked: %v", r)
+		}
+	}()
+	StakeAmount(delegate, "0")
+
+	// simulate time passing and additional stakes
+	currentTime := uint64(1000)
+	gStaker.delegationHistory[delegateAddr] = []DelegationHistory{
+		{amount: u256.NewUint(2500), timestamp: currentTime, add: true},
+		{amount: u256.NewUint(1000), timestamp: currentTime + 100, add: false},
+		{amount: u256.NewUint(500), timestamp: currentTime + 200, add: true},
+	}
+
+	tests := []struct {
+		name           string
+		timestamp      uint64
+		expectedResult string
+	}{
+		{
+			name:           "period +50",
+			timestamp:      currentTime + 50, // 1050
+			expectedResult: "125000",         // (2500 * 50)
+		},
+		{
+			name:           "period +100",
+			timestamp:      currentTime + 100, // 1100
+			expectedResult: "250000",          // (2500 * 100)
+		},
+		{
+			name:           "period +150",
+			timestamp:      currentTime + 150, // 1100
+			expectedResult: "325000",          // (2500 * 150 - 1000 * 50)
+		},
+		{
+			name:           "period +200",
+			timestamp:      currentTime + 200, // 1200
+			expectedResult: "400000",          // (2500 * 200 - 1000 * 100 + 500 * 0)
+		},
+		{
+			name:           "period +250",
+			timestamp:      currentTime + 250, // 1250
+			expectedResult: "500000",          // (2500 * 250 - 1000 * 150 + 500 * 50)
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := GetDelegatedCumulative(delegate, tt.timestamp)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if result != tt.expectedResult {
+				t.Errorf("Expected %s, got %s", tt.expectedResult, result)
+			}
+		})
+	}
+}
+
 func TestGetAverageDelegated(t *testing.T) {
 	token := newMockGRC20("Test Token", "TST", 42)
 	Init(token)
@@ -178,9 +243,10 @@ func TestGetAverageDelegated(t *testing.T) {
 	// simulate time passing and additional stakes
 	currentTime := uint64(1000)
 	gStaker.delegationHistory[delegateAddr] = []DelegationHistory{
-		{amount: u256.NewUint(1000), timestamp: currentTime},
-		{amount: u256.NewUint(1500), timestamp: currentTime + 100},
-		{amount: u256.NewUint(2000), timestamp: currentTime + 200},
+		{amount: u256.NewUint(1000), timestamp: currentTime, add: true},
+		{amount: u256.NewUint(1500), timestamp: currentTime + 100, add: true},
+		{amount: u256.NewUint(2000), timestamp: currentTime + 200, add: true},
+		{amount: u256.NewUint(500), timestamp: currentTime + 250, add: false},
 	}
 
 	tests := []struct {
@@ -192,20 +258,14 @@ func TestGetAverageDelegated(t *testing.T) {
 		{
 			name:           "Full period average",
 			start:          currentTime,
-			end:            currentTime + 200,
-			expectedResult: "1250", // (1000*100 + 1500*100 + 2000*0) / 200
+			end:            currentTime + 250,
+			expectedResult: "2300", // (1000*250 + 1500*150 + 2000*50 - 500*0) / 250
 		},
 		{
 			name:           "Partial period average",
 			start:          currentTime + 50,
 			end:            currentTime + 150,
-			expectedResult: "1250", // (1000*50 + 1500*50) / 100
-		},
-		{
-			name:           "Single point in time",
-			start:          currentTime + 100,
-			end:            currentTime + 100,
-			expectedResult: "1500",
+			expectedResult: "1750", // (1000*100 + 1500*50) / 100
 		},
 		{
 			name:           "Period before any stakes",
@@ -217,7 +277,7 @@ func TestGetAverageDelegated(t *testing.T) {
 			name:           "Period after all recorded stakes",
 			start:          currentTime + 300,
 			end:            currentTime + 400,
-			expectedResult: "2000",
+			expectedResult: "4000", // (1000 * 100 + 1500 * 100 + 2000 * 100 - 500 * 100) / 100
 		},
 	}
 
@@ -251,9 +311,9 @@ func TestGetAverageDelegatedOverLast(t *testing.T) {
 	// Set up delegation history
 	now := uint64(time.Now().Unix())
 	gStaker.delegationHistory[delegateAddr] = []DelegationHistory{
-		{amount: u256.NewUint(1000), timestamp: now - 100},
-		{amount: u256.NewUint(2000), timestamp: now - 50},
-		{amount: u256.NewUint(3000), timestamp: now},
+		{amount: u256.NewUint(2500), timestamp: now - 100, add: true},
+		{amount: u256.NewUint(1000), timestamp: now - 50, add: false},
+		{amount: u256.NewUint(3000), timestamp: now, add: true},
 	}
 
 	avg, err := GetAverageDelegatedOverLast(delegate, uint64(100))
@@ -261,8 +321,8 @@ func TestGetAverageDelegatedOverLast(t *testing.T) {
 		t.Fatalf("GetAverageDelegatedOverLast failed: %v", err)
 	}
 
-	if avg != "1500" { // (1000*50 + 2000*50) / 100
-		t.Errorf("Expected 1500, got %s", avg)
+	if avg != "2000" { // (2500*100 - 1000*50) / 100
+		t.Errorf("Expected 2000, got %s", avg)
 	}
 }
 

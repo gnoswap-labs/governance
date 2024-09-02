@@ -106,7 +106,6 @@ type Call struct {
 }
 
 // hashCalls computes the hash of a list of calls
-
 func hashCalls(calls []Call) string {
 	var buf strings.Builder
 	buf.WriteString("governance::governor::Governor::hash_calls")
